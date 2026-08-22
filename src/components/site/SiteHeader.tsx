@@ -41,13 +41,7 @@ export function SiteHeader() {
                 {item.label}
               </Link>
             ))}
-            <Link
-              to="/cart"
-              className="inline-flex items-center gap-2 rounded-sm border border-input px-3 py-2 text-sm font-medium"
-            >
-              <ShoppingBag className="h-4 w-4" aria-hidden="true" />
-              Basket{count > 0 ? ` (${count})` : ""}
-            </Link>
+            <CartDrawer />
             <Link
               to="/order"
               className="rounded-sm bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
@@ -56,16 +50,19 @@ export function SiteHeader() {
             </Link>
           </nav>
 
+          <div className="flex items-center gap-2 md:hidden">
+            <CartDrawer />
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              className="inline-flex items-center gap-2 rounded-sm border border-input px-3 py-2 text-sm font-medium"
+              aria-label="Open menu"
+            >
+              <Menu className="h-4 w-4" aria-hidden="true" />
+              Menu
+            </button>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            className="inline-flex items-center gap-2 rounded-sm border border-input px-3 py-2 text-sm font-medium md:hidden"
-            aria-label="Open menu"
-          >
-            <Menu className="h-4 w-4" aria-hidden="true" />
-            Menu
-          </button>
         </div>
       </header>
 
