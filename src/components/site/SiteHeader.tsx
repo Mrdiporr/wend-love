@@ -16,7 +16,6 @@ const NAV = [
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
-  const { count } = useCart();
 
 
   return (
