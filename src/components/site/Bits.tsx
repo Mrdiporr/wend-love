@@ -1,0 +1,117 @@
+import type { ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
+import { MessageCircle } from "lucide-react";
+import { BUSINESS, type Product } from "@/data/catalog";
+
+export function Section({
+  children,
+  className = "",
+  tone = "cream",
+}: {
+  children: ReactNode;
+  className?: string;
+  tone?: "cream" | "sand" | "cocoa";
+}) {
+  const bg =
+    tone === "cocoa"
+      ? "bg-cocoa text-cocoa-foreground"
+      : tone === "sand"
+        ? "bg-secondary"
+        : "";
+  return (
+    <section className={`${bg} ${className}`}>
+      <div className="mx-auto max-w-[1200px] px-5 py-16 md:py-24">{children}</div>
+    </section>
+  );
+}
+
+export function Eyebrow({ children }: { children: ReactNode }) {
+  return <p className="eyebrow text-gold">{children}</p>;
+}
+
+export function PageHeader({
+  eyebrow,
+  title,
+  lead,
+}: {
+  eyebrow: string;
+  title: string;
+  lead?: string;
+}) {
+  return (
+    <div className="bg-cocoa text-cocoa-foreground">
+      <div className="mx-auto max-w-[1200px] px-5 py-16 md:py-20">
+        <Eyebrow>{eyebrow}</Eyebrow>
+        <h1 className="mt-4 max-w-3xl text-4xl md:text-6xl">{title}</h1>
+        {lead && (
+          <p className="mt-5 max-w-[62ch] text-base text-cocoa-foreground/75 md:text-lg">{lead}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function ProductCard({ product }: { product: Product }) {
+  return (
+    <article className="group flex flex-col overflow-hidden rounded-[1.5rem] border border-border bg-card shadow-[0_10px_30px_-18px_color-mix(in_oklab,var(--primary)_45%,transparent)]">
+      <Link
+        to="/menu/$slug"
+        params={{ slug: product.slug }}
+        className="block overflow-hidden rounded-[1.5rem] p-2"
+        tabIndex={-1}
+        aria-hidden="true"
+      >
+        <img
+          src={product.image}
+          alt=""
+          loading="lazy"
+          className="aspect-[4/3] w-full rounded-[1.15rem] object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+        />
+      </Link>
+      <div className="flex flex-1 flex-col p-5">
+        <h3 className="font-display text-xl">
+          <Link to="/menu/$slug" params={{ slug: product.slug }} className="hover:text-primary">
+            {product.name}
+          </Link>
+        </h3>
+        <p className="mt-2 font-display text-lg text-gold">{product.priceBand}</p>
+        <p className="mt-2 text-sm text-muted-foreground">{product.short}</p>
+        <p className="eyebrow mt-4 text-[11px] text-muted-foreground">{product.lead}</p>
+      </div>
+    </article>
+  );
+}
+
+export function CtaBand() {
+  return (
+    <section className="bg-primary text-primary-foreground">
+      <div className="mx-auto flex max-w-[1200px] flex-col gap-6 px-5 py-14 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-3xl md:text-4xl">Tell me what you&rsquo;re celebrating.</h2>
+          <p className="mt-3 max-w-[52ch] text-primary-foreground/80">
+            Four short steps, a firm quote back within 24 hours, and a pickup slot in Etobicoke.
+            No guessing at prices.
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-3">
+          <Link
+            to="/order"
+            className="rounded-sm bg-background px-5 py-3 text-sm font-semibold text-foreground"
+          >
+            Start an order
+          </Link>
+          <a
+            href={BUSINESS.whatsapp}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="inline-flex items-center gap-2 rounded-sm border border-primary-foreground/40 px-5 py-3 text-sm font-semibold"
+          >
+            <MessageCircle className="h-4 w-4" aria-hidden="true" />
+            WhatsApp
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
