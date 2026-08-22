@@ -1,8 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { ShieldCheck, MapPin, Clock, Sparkles } from "lucide-react";
 import heroCake from "@/assets/hero-cake.jpg";
-import { BUSINESS, CATEGORIES, PRICE_BANDS, PRODUCTS } from "@/data/catalog";
-import { CtaBand, Eyebrow, ProductCard, Section } from "@/components/site/Bits";
+import { BUSINESS, PRICE_BANDS } from "@/data/catalog";
+import {
+  CtaBand,
+  Eyebrow,
+  ProductCard,
+  ProductCardSkeleton,
+  Section,
+} from "@/components/site/Bits";
+import { SmartImage } from "@/components/site/SmartImage";
+import { catalogQueryOptions, categoryImage } from "@/lib/shop";
 
 const TITLE = "Wendy's Bakehouse — Custom Cakes in Toronto & Etobicoke";
 const DESC =
