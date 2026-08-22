@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Menu, X, MessageCircle, ShoppingBag } from "lucide-react";
+import { Menu, X, MessageCircle } from "lucide-react";
 import { Lockup } from "./Brand";
 import { BUSINESS } from "@/data/catalog";
-import { useCart } from "@/lib/cart";
+import { CartDrawer } from "@/components/site/CartDrawer";
+
 
 
 const NAV = [
