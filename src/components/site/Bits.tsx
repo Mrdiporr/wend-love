@@ -1,7 +1,10 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { MessageCircle } from "lucide-react";
-import { BUSINESS, type Product } from "@/data/catalog";
+import { BUSINESS } from "@/data/catalog";
+import { imageSrc, priceLabel, type ShopProduct } from "@/lib/shop";
+import { SmartImage } from "@/components/site/SmartImage";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function Section({
   children,
