@@ -1,19 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { CATEGORIES, PRODUCTS, type CategoryId } from "@/data/catalog";
-import { CtaBand, PageHeader, ProductCard, Section } from "@/components/site/Bits";
+import { useQuery } from "@tanstack/react-query";
+import { CtaBand, PageHeader, ProductCard, ProductCardSkeleton, Section } from "@/components/site/Bits";
+import { catalogQueryOptions } from "@/lib/shop";
 
 const TITLE = "Menu & Prices — Wendy's Bakehouse, Cakes in Toronto";
 const DESC =
-  "Browse celebration cakes, Nigerian meat pies, cake loaves, cupcakes and gift boxes with published price bands and lead times. Pickup in Etobicoke, Toronto.";
+  "Browse custom celebration cakes and themed cakes with published prices and lead times. Pickup in Etobicoke, Toronto.";
 
-type Search = { category?: CategoryId };
+type Search = { category?: string };
 
 export const Route = createFileRoute("/menu/")({
   validateSearch: (search: Record<string, unknown>): Search => {
     const c = search["category"];
-    const valid: CategoryId[] = ["cakes", "pastries", "cupcakes", "gift-boxes"];
-    return valid.includes(c as CategoryId) ? { category: c as CategoryId } : {};
+    return typeof c === "string" && c.length > 0 && c.length < 80 ? { category: c } : {};
   },
+  loader: ({ context }) => context.queryClient.ensureQueryData(catalogQueryOptions),
   head: () => ({
     meta: [
       { title: TITLE },
@@ -29,14 +30,18 @@ export const Route = createFileRoute("/menu/")({
 
 function MenuPage() {
   const { category } = Route.useSearch();
-  const items = category ? PRODUCTS.filter((p) => p.category === category) : PRODUCTS;
+  const { data, isPending } = useQuery(catalogQueryOptions);
+
+  const categories = data?.categories ?? [];
+  const active = categories.find((c) => c.slug === category);
+  const items = (data?.products ?? []).filter((p) => !active || p.category_id === active.id);
 
   return (
     <>
       <PageHeader
         eyebrow="Menu"
         title="The whole menu, with the prices written down."
-        lead="Celebration cakes, Naija pastries, cupcakes and gift boxes. Prices are bands — the quote you get back is a firm number for your size, finish and date."
+        lead="Custom celebration cakes and themed cakes. Every price includes the finish shown — tell me the size, flavour and date and the quote comes back firm."
       />
 
       <Section>
@@ -50,13 +55,13 @@ function MenuPage() {
           >
             All
           </Link>
-          {CATEGORIES.map((c) => (
+          {categories.map((c) => (
             <Link
               key={c.id}
               to="/menu"
-              search={{ category: c.id }}
+              search={{ category: c.slug }}
               className={`rounded-sm border px-4 py-2 text-sm font-medium ${
-                category === c.id
+                category === c.slug
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-input"
               }`}
@@ -64,18 +69,26 @@ function MenuPage() {
               {c.name}
             </Link>
           ))}
-          <span className="ml-auto text-sm text-muted-foreground">{items.length} items</span>
+          {!isPending && (
+            <span className="ml-auto text-sm text-muted-foreground">{items.length} items</span>
+          )}
         </div>
 
         <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {items.map((p) => (
-            <ProductCard key={p.slug} product={p} />
-          ))}
+          {isPending
+            ? Array.from({ length: 6 }).map((_, i) => <ProductCardSkeleton key={i} />)
+            : items.map((p) => <ProductCard key={p.slug} product={p} />)}
         </div>
 
+        {!isPending && items.length === 0 && (
+          <p className="mt-10 text-sm text-muted-foreground">
+            Nothing in this collection yet — check back soon.
+          </p>
+        )}
+
         <p className="mt-10 max-w-[70ch] text-sm text-muted-foreground">
-          Prices shown in CAD. Loaves, meat pies and party trays are quoted on enquiry because
-          quantity changes the rate — ask and you will get a number the same day, not a runaround.
+          Prices shown in CAD. Larger tiers, party trays and bespoke sculpted work are quoted on
+          enquiry — ask and you will get a number the same day, not a runaround.
         </p>
       </Section>
 

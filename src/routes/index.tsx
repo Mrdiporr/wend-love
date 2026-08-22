@@ -1,8 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { ShieldCheck, MapPin, Clock, Sparkles } from "lucide-react";
 import heroCake from "@/assets/hero-cake.jpg";
-import { BUSINESS, CATEGORIES, PRICE_BANDS, PRODUCTS } from "@/data/catalog";
-import { CtaBand, Eyebrow, ProductCard, Section } from "@/components/site/Bits";
+import { BUSINESS, PRICE_BANDS } from "@/data/catalog";
+import {
+  CtaBand,
+  Eyebrow,
+  ProductCard,
+  ProductCardSkeleton,
+  Section,
+} from "@/components/site/Bits";
+import { SmartImage } from "@/components/site/SmartImage";
+import { catalogQueryOptions, categoryImage } from "@/lib/shop";
 
 const TITLE = "Wendy's Bakehouse — Custom Cakes in Toronto & Etobicoke";
 const DESC =
@@ -30,14 +39,11 @@ const STEPS = [
 ];
 
 function Index() {
-  const signature = PRODUCTS.filter((p) =>
-    [
-      "signature-6-inch-celebration-cake",
-      "nigerian-meat-pies",
-      "cupcakes-set-of-twelve",
-      "cake-loaves",
-    ].includes(p.slug),
-  );
+  const { data, isPending } = useQuery(catalogQueryOptions);
+  const products = data?.products ?? [];
+  const categories = data?.categories ?? [];
+  const signature = products.slice(0, 4);
+
 
   return (
     <>
@@ -91,21 +97,21 @@ function Index() {
       </section>
 
       <Section>
-        <Eyebrow>Shop by category</Eyebrow>
-        <h2 className="mt-4 text-3xl md:text-4xl">Two menus, one kitchen.</h2>
-        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {CATEGORIES.map((c) => (
+        <Eyebrow>Shop by collection</Eyebrow>
+        <h2 className="mt-4 text-3xl md:text-4xl">Two collections, one kitchen.</h2>
+        <div className="mt-10 grid gap-6 sm:grid-cols-2">
+          {categories.map((c) => (
             <Link
               key={c.id}
               to="/menu"
-              search={{ category: c.id }}
+              search={{ category: c.slug }}
               className="group overflow-hidden rounded-[1.5rem] border border-border bg-card p-2"
             >
-              <img
-                src={c.image}
-                alt=""
-                loading="lazy"
-                className="aspect-[4/3] w-full rounded-[1.15rem] object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+              <SmartImage
+                src={categoryImage(c, products)}
+                alt={c.name}
+                ratio="aspect-[4/3]"
+                className="transition-transform duration-300 group-hover:scale-[1.03]"
               />
               <div className="p-5">
                 <h3 className="font-display text-xl group-hover:text-primary">{c.name}</h3>
@@ -114,6 +120,7 @@ function Index() {
             </Link>
           ))}
         </div>
+
       </Section>
 
       <Section tone="sand">
@@ -171,10 +178,11 @@ function Index() {
           </Link>
         </div>
         <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {signature.map((p) => (
-            <ProductCard key={p.slug} product={p} />
-          ))}
+          {isPending
+            ? Array.from({ length: 4 }).map((_, i) => <ProductCardSkeleton key={i} />)
+            : signature.map((p) => <ProductCard key={p.slug} product={p} />)}
         </div>
+
       </Section>
 
       <Section tone="cocoa">

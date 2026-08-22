@@ -1,8 +1,10 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { Check, MessageCircle } from "lucide-react";
-import { BUSINESS, PRODUCTS } from "@/data/catalog";
+import { BUSINESS } from "@/data/catalog";
 import { CtaBand, ProductCard, Section } from "@/components/site/Bits";
 import { AddToBasket } from "@/components/site/AddToBasket";
+import { SmartImage } from "@/components/site/SmartImage";
+import { catalogQueryOptions, imageSrc, priceLabel, type ShopProduct } from "@/lib/shop";
 
 import {
   Accordion,
@@ -12,10 +14,14 @@ import {
 } from "@/components/ui/accordion";
 
 export const Route = createFileRoute("/menu/$slug")({
-  loader: ({ params }) => {
-    const product = PRODUCTS.find((p) => p.slug === params.slug);
+  loader: async ({ params, context }) => {
+    const catalog = await context.queryClient.ensureQueryData(catalogQueryOptions);
+    const product = catalog.products.find((p) => p.slug === params.slug);
     if (!product) throw notFound();
-    return { product };
+    const related = catalog.products
+      .filter((p) => p.category_id === product.category_id && p.slug !== product.slug)
+      .slice(0, 3);
+    return { product, related };
   },
   head: ({ loaderData }) => {
     if (!loaderData) {
@@ -25,7 +31,7 @@ export const Route = createFileRoute("/menu/$slug")({
     }
     const { product } = loaderData;
     const title = `${product.name} — Wendy's Bakehouse, Toronto`;
-    const desc = `${product.short} ${product.priceBand}. ${product.lead}. Pickup in Etobicoke, Toronto.`;
+    const desc = `${product.short} ${priceLabel(product)}. ${product.lead_time}. Pickup in Etobicoke, Toronto.`;
     return {
       meta: [
         { title },
@@ -60,13 +66,13 @@ function ProductNotFound() {
 }
 
 function ProductPage() {
-  const { product } = Route.useLoaderData();
-  const related = PRODUCTS.filter(
-    (p) => p.category === product.category && p.slug !== product.slug,
-  ).slice(0, 3);
+  const { product, related } = Route.useLoaderData() as {
+    product: ShopProduct;
+    related: ShopProduct[];
+  };
 
   const waText = encodeURIComponent(
-    `Hi Wendy, I'd like to order: ${product.name} (${product.priceBand}). Could you send me a quote?`,
+    `Hi Wendy, I'd like to order: ${product.name} (${priceLabel(product)}). Could you send me a quote?`,
   );
 
   return (
@@ -82,46 +88,31 @@ function ProductPage() {
 
         <div className="grid gap-10 py-10 md:grid-cols-12 md:py-14">
           <div className="md:col-span-6">
-            <img
-              src={product.image}
-              alt={product.name}
-              className="w-full rounded-[1.75rem] object-cover md:sticky md:top-28"
-            />
+            <div className="md:sticky md:top-28">
+              <SmartImage
+                src={imageSrc(product)}
+                alt={product.name}
+                ratio="aspect-square"
+                rounded="rounded-[1.75rem]"
+                priority
+              />
+            </div>
           </div>
 
           <div className="md:col-span-6">
             <h1 className="text-4xl md:text-5xl">{product.name}</h1>
-            <p className="mt-5 font-display text-3xl text-gold">{product.priceBand}</p>
-            {product.priceNote && (
-              <p className="mt-2 text-sm text-muted-foreground">{product.priceNote}</p>
+            <p className="mt-5 font-display text-3xl text-gold">{priceLabel(product)}</p>
+            {product.price_note && (
+              <p className="mt-2 text-sm text-muted-foreground">{product.price_note}</p>
             )}
             <p className="eyebrow mt-4 text-[11px] text-muted-foreground">
-              {product.lead} · Pickup in Etobicoke
+              {product.lead_time} · {product.serves ?? "Pickup in Etobicoke"}
             </p>
 
             <p className="mt-6 max-w-[64ch] text-base leading-relaxed">{product.description}</p>
 
             <div className="mt-8">
               <AddToBasket slug={product.slug} />
-            </div>
-
-
-            <div className="mt-8 space-y-5">
-              {product.options.map((opt) => (
-                <div key={opt.label}>
-                  <h2 className="eyebrow text-muted-foreground">{opt.label}</h2>
-                  <ul className="mt-3 flex flex-wrap gap-2">
-                    {opt.values.map((v) => (
-                      <li
-                        key={v}
-                        className="rounded-sm border border-input bg-secondary px-3 py-1.5 text-sm"
-                      >
-                        {v}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
             </div>
 
             <ul className="mt-8 space-y-2 border-t border-border pt-6 text-sm">
@@ -134,13 +125,6 @@ function ProductPage() {
             </ul>
 
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link
-                to="/order"
-                search={{ product: product.slug }}
-                className="rounded-sm bg-primary px-6 py-3.5 text-sm font-semibold text-primary-foreground"
-              >
-                Start an order for this
-              </Link>
               <a
                 href={`${BUSINESS.whatsapp}?text=${waText}`}
                 target="_blank"

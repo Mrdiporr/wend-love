@@ -1,7 +1,10 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { MessageCircle } from "lucide-react";
-import { BUSINESS, type Product } from "@/data/catalog";
+import { BUSINESS } from "@/data/catalog";
+import { imageSrc, priceLabel, type ShopProduct } from "@/lib/shop";
+import { SmartImage } from "@/components/site/SmartImage";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function Section({
   children,
@@ -51,7 +54,7 @@ export function PageHeader({
   );
 }
 
-export function ProductCard({ product }: { product: Product }) {
+export function ProductCard({ product }: { product: ShopProduct }) {
   return (
     <article className="group flex flex-col overflow-hidden rounded-[1.5rem] border border-border bg-card shadow-[0_10px_30px_-18px_color-mix(in_oklab,var(--primary)_45%,transparent)]">
       <Link
@@ -61,11 +64,11 @@ export function ProductCard({ product }: { product: Product }) {
         tabIndex={-1}
         aria-hidden="true"
       >
-        <img
-          src={product.image}
-          alt=""
-          loading="lazy"
-          className="aspect-[4/3] w-full rounded-[1.15rem] object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+        <SmartImage
+          src={imageSrc(product)}
+          alt={product.name}
+          ratio="aspect-square"
+          className="transition-transform duration-300 group-hover:scale-[1.03]"
         />
       </Link>
       <div className="flex flex-1 flex-col p-5">
@@ -74,13 +77,30 @@ export function ProductCard({ product }: { product: Product }) {
             {product.name}
           </Link>
         </h3>
-        <p className="mt-2 font-display text-lg text-gold">{product.priceBand}</p>
+        <p className="mt-2 font-display text-lg text-gold">{priceLabel(product)}</p>
         <p className="mt-2 text-sm text-muted-foreground">{product.short}</p>
-        <p className="eyebrow mt-4 text-[11px] text-muted-foreground">{product.lead}</p>
+        <p className="eyebrow mt-4 text-[11px] text-muted-foreground">{product.lead_time}</p>
       </div>
     </article>
   );
 }
+
+export function ProductCardSkeleton() {
+  return (
+    <div className="flex flex-col overflow-hidden rounded-[1.5rem] border border-border bg-card">
+      <div className="p-2">
+        <Skeleton className="aspect-square w-full rounded-[1.15rem]" />
+      </div>
+      <div className="space-y-3 p-5">
+        <Skeleton className="h-5 w-2/3" />
+        <Skeleton className="h-5 w-1/3" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-3 w-1/2" />
+      </div>
+    </div>
+  );
+}
+
 
 export function CtaBand() {
   return (
