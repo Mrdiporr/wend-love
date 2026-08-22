@@ -116,6 +116,7 @@ export type Database = {
       orders: {
         Row: {
           allergies: string | null
+          checkout_method: string
           created_at: string
           customer_name: string
           delivery_area: string | null
@@ -127,6 +128,7 @@ export type Database = {
           id: string
           notes: string | null
           occasion: string | null
+          payer_name: string | null
           payment_provider: string | null
           payment_reference: string | null
           payment_status: string
@@ -134,12 +136,16 @@ export type Database = {
           pickup_date: string | null
           pickup_window: string | null
           reference: string
+          slip_path: string | null
           status: string
           subtotal_cents: number
+          transfer_date: string | null
+          transfer_reference: string | null
           updated_at: string
         }
         Insert: {
           allergies?: string | null
+          checkout_method?: string
           created_at?: string
           customer_name: string
           delivery_area?: string | null
@@ -151,6 +157,7 @@ export type Database = {
           id?: string
           notes?: string | null
           occasion?: string | null
+          payer_name?: string | null
           payment_provider?: string | null
           payment_reference?: string | null
           payment_status?: string
@@ -158,12 +165,16 @@ export type Database = {
           pickup_date?: string | null
           pickup_window?: string | null
           reference: string
+          slip_path?: string | null
           status?: string
           subtotal_cents?: number
+          transfer_date?: string | null
+          transfer_reference?: string | null
           updated_at?: string
         }
         Update: {
           allergies?: string | null
+          checkout_method?: string
           created_at?: string
           customer_name?: string
           delivery_area?: string | null
@@ -175,6 +186,7 @@ export type Database = {
           id?: string
           notes?: string | null
           occasion?: string | null
+          payer_name?: string | null
           payment_provider?: string | null
           payment_reference?: string | null
           payment_status?: string
@@ -182,8 +194,11 @@ export type Database = {
           pickup_date?: string | null
           pickup_window?: string | null
           reference?: string
+          slip_path?: string | null
           status?: string
           subtotal_cents?: number
+          transfer_date?: string | null
+          transfer_reference?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -267,6 +282,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      settings: {
+        Row: {
+          bank_account_name: string
+          bank_account_number: string
+          bank_name: string
+          bank_note: string
+          created_at: string
+          id: string
+          singleton: boolean
+          updated_at: string
+          whatsapp_number: string
+        }
+        Insert: {
+          bank_account_name?: string
+          bank_account_number?: string
+          bank_name?: string
+          bank_note?: string
+          created_at?: string
+          id?: string
+          singleton?: boolean
+          updated_at?: string
+          whatsapp_number?: string
+        }
+        Update: {
+          bank_account_name?: string
+          bank_account_number?: string
+          bank_name?: string
+          bank_note?: string
+          created_at?: string
+          id?: string
+          singleton?: boolean
+          updated_at?: string
+          whatsapp_number?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
