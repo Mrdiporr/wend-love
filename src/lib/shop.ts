@@ -1,5 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { getCatalog } from "@/lib/catalog.functions";
 
 import heroCake from "@/assets/hero-cake.jpg";
 import meatPies from "@/assets/meat-pies.jpg";
@@ -40,6 +40,22 @@ export type ShopProduct = {
   includes: string[];
   available: boolean;
   sort_order: number;
+};
+
+export type ShopSettings = {
+  bank_account_name: string;
+  bank_account_number: string;
+  bank_name: string;
+  bank_note: string;
+  whatsapp_number: string;
+};
+
+export const FALLBACK_SETTINGS: ShopSettings = {
+  bank_account_name: "Wendy's Bakehouse",
+  bank_account_number: "0000000000",
+  bank_name: "Bank name pending",
+  bank_note: "Use your order reference as the transfer description.",
+  whatsapp_number: "+1 647 620 2518",
 };
 
 const BUNDLED: Record<string, string> = {
@@ -98,16 +114,12 @@ function parseStrings(value: unknown): string[] {
 export async function fetchCatalog(): Promise<{
   categories: ShopCategory[];
   products: ShopProduct[];
+  settings: ShopSettings;
 }> {
-  const [cats, prods] = await Promise.all([
-    supabase.from("categories").select("*").order("sort_order"),
-    supabase.from("products").select("*").order("sort_order"),
-  ]);
-  if (cats.error) throw new Error(cats.error.message);
-  if (prods.error) throw new Error(prods.error.message);
+  const data = await getCatalog();
 
   return {
-    categories: (cats.data ?? []).map((c) => ({
+    categories: data.categories.map((c) => ({
       id: c.id,
       slug: c.slug,
       name: c.name,
@@ -116,7 +128,7 @@ export async function fetchCatalog(): Promise<{
       image_url: c.image_url,
       sort_order: c.sort_order,
     })),
-    products: (prods.data ?? []).map((p) => ({
+    products: data.products.map((p) => ({
       id: p.id,
       slug: p.slug,
       name: p.name,
@@ -137,6 +149,7 @@ export async function fetchCatalog(): Promise<{
       available: p.available,
       sort_order: p.sort_order,
     })),
+    settings: data.settings ?? FALLBACK_SETTINGS,
   };
 }
 
@@ -145,3 +158,9 @@ export const catalogQueryOptions = queryOptions({
   queryFn: fetchCatalog,
   staleTime: 30_000,
 });
+
+export function categoryImage(category: ShopCategory, products: ShopProduct[]): string {
+  if (category.image_url || category.image_key) return imageSrc(category);
+  const first = products.find((p) => p.category_id === category.id);
+  return imageSrc(first ?? null);
+}
