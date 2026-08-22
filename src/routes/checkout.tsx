@@ -1,19 +1,30 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
+import { MessageCircle, Landmark, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, Section } from "@/components/site/Bits";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useCart } from "@/lib/cart";
-import { formatMoney } from "@/lib/shop";
-import { BUSINESS } from "@/data/catalog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useCart, lineDueCents } from "@/lib/cart";
+import { catalogQueryOptions, formatMoney, FALLBACK_SETTINGS } from "@/lib/shop";
 import { placeOrder } from "@/lib/orders.functions";
 
 const TITLE = "Checkout — Wendy's Bakehouse, Cakes in Toronto";
 const DESC =
-  "Confirm your pickup details and place your bakery order for collection in Etobicoke, Toronto.";
+  "Confirm your order over WhatsApp or by bank transfer, for collection in Etobicoke, Toronto.";
+
+const MAX_SLIP_BYTES = 5 * 1024 * 1024;
+const ALLOWED_SLIP_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "application/pdf",
+] as const;
 
 export const Route = createFileRoute("/checkout")({
   head: () => ({
@@ -36,12 +47,33 @@ function minDate() {
   return d.toISOString().slice(0, 10);
 }
 
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Could not read that file."));
+    reader.readAsDataURL(file);
+  });
+}
+
+type Receipt = {
+  reference: string;
+  dueNowCents: number;
+  hasQuoteItems: boolean;
+  method: "whatsapp" | "bank_transfer";
+  waLink: string;
+};
+
 function CheckoutPage() {
   const { items, dueNowCents, hasQuoteItems, clear } = useCart();
   const submitOrder = useServerFn(placeOrder);
+  const { data: catalog } = useQuery(catalogQueryOptions);
+  const settings = catalog?.settings ?? FALLBACK_SETTINGS;
 
+  const [method, setMethod] = useState<"whatsapp" | "bank_transfer">("whatsapp");
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState<{ reference: string; dueNowCents: number } | null>(null);
+  const [slip, setSlip] = useState<File | null>(null);
+  const [done, setDone] = useState<Receipt | null>(null);
   const [form, setForm] = useState({
     customer_name: "",
     phone: "",
@@ -53,9 +85,118 @@ function CheckoutPage() {
     occasion: "",
     notes: "",
     allergies: "",
+    payer_name: "",
+    transfer_reference: "",
+    transfer_date: "",
   });
 
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  function buildWhatsAppLink(reference: string) {
+    const lines = items.map((i) => {
+      const total = lineDueCents(i);
+      const opts = Object.entries(i.options)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(", ");
+      return `• ${i.quantity} × ${i.name}${opts ? ` (${opts})` : ""} — ${
+        total > 0 ? formatMoney(total) : "quoted"
+      }`;
+    });
+    const body = [
+      `Hi Wendy, here is my order ${reference}.`,
+      "",
+      ...lines,
+      "",
+      `Total due: ${formatMoney(dueNowCents)}${hasQuoteItems ? " + quoted items" : ""}`,
+      `Name: ${form.customer_name}`,
+      `Phone: ${form.phone}`,
+      form.pickup_date ? `Date needed: ${form.pickup_date} (${form.pickup_window})` : "",
+      form.fulfilment === "delivery"
+        ? `Delivery to: ${form.delivery_area || "to confirm"}`
+        : "Pickup in Etobicoke",
+      form.occasion ? `Occasion: ${form.occasion}` : "",
+      form.notes ? `Notes: ${form.notes}` : "",
+      form.allergies ? `Allergies: ${form.allergies}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+    const digits = settings.whatsapp_number.replace(/\D/g, "");
+    return `https://wa.me/${digits}?text=${encodeURIComponent(body)}`;
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+
+    if (method === "bank_transfer") {
+      if (!form.payer_name.trim()) {
+        toast.error("Add the name the transfer was sent from.");
+        return;
+      }
+      if (slip && slip.size > MAX_SLIP_BYTES) {
+        toast.error("Payment slips must be smaller than 5MB.");
+        return;
+      }
+    }
+
+    setBusy(true);
+    try {
+      let slipPayload: { filename: string; content_type: string; data_base64: string } | undefined;
+      if (method === "bank_transfer" && slip) {
+        slipPayload = {
+          filename: slip.name,
+          content_type: slip.type,
+          data_base64: await readFileAsBase64(slip),
+        };
+      }
+
+      const result = await submitOrder({
+        data: {
+          customer_name: form.customer_name,
+          phone: form.phone,
+          email: form.email || undefined,
+          pickup_date: form.pickup_date || undefined,
+          pickup_window: form.pickup_window,
+          fulfilment: form.fulfilment,
+          delivery_area: form.fulfilment === "delivery" ? form.delivery_area : undefined,
+          occasion: form.occasion || undefined,
+          notes: form.notes || undefined,
+          allergies: form.allergies || undefined,
+          checkout_method: method,
+          payer_name: method === "bank_transfer" ? form.payer_name : undefined,
+          transfer_reference:
+            method === "bank_transfer" ? form.transfer_reference || undefined : undefined,
+          transfer_date: method === "bank_transfer" ? form.transfer_date || undefined : undefined,
+          ...(slipPayload
+            ? { slip: slipPayload as NonNullable<Parameters<typeof placeOrder>[0]> extends never ? never : typeof slipPayload }
+            : {}),
+          items: items.map((i) => ({
+            slug: i.slug,
+            quantity: i.quantity,
+            options: i.options,
+            notes: i.notes,
+          })),
+        } as Parameters<typeof submitOrder>[0]["data"],
+      });
+
+      const waLink = buildWhatsAppLink(result.reference);
+      clear();
+      setDone({
+        reference: result.reference,
+        dueNowCents: result.dueNowCents,
+        hasQuoteItems: result.hasQuoteItems,
+        method,
+        waLink,
+      });
+      if (method === "whatsapp") window.open(waLink, "_blank", "noopener");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Something went wrong. Please try again.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
 
   if (done) {
     return (
@@ -68,18 +209,25 @@ function CheckoutPage() {
         <Section>
           <ol className="max-w-[70ch] space-y-6">
             <li className="border-t border-border pt-5">
-              <h2 className="font-display text-xl">Confirmation within 24 hours</h2>
+              <h2 className="font-display text-xl">
+                {done.method === "whatsapp"
+                  ? "Send your receipt on WhatsApp"
+                  : "Payment verification"}
+              </h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                Wendy confirms your date and sends the final price for any quoted items on{" "}
-                {form.phone || "your number"}.
+                {done.method === "whatsapp"
+                  ? "Your itemised receipt is ready to send — tap the button below if the chat did not open."
+                  : "Wendy checks your slip against the account and marks the order paid, usually within a few hours."}
               </p>
             </li>
             <li className="border-t border-border pt-5">
               <h2 className="font-display text-xl">
-                {done.dueNowCents > 0 ? `Payment of ${formatMoney(done.dueNowCents)}` : "Payment"}
+                {done.dueNowCents > 0 ? `Total ${formatMoney(done.dueNowCents)}` : "Pricing"}
               </h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                A secure card payment link is sent with your confirmation. Payment holds the date.
+                {done.hasQuoteItems
+                  ? "Quoted items are priced within 24 hours and added to your total."
+                  : "Your order is marked Not Paid until payment lands."}
               </p>
             </li>
             <li className="border-t border-border pt-5">
@@ -91,14 +239,19 @@ function CheckoutPage() {
           </ol>
           <div className="mt-8 flex flex-wrap gap-3">
             <a
-              href={BUSINESS.whatsapp}
+              href={done.waLink}
               target="_blank"
               rel="noreferrer noopener"
-              className="rounded-sm bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground"
+              className="inline-flex items-center gap-2 rounded-sm bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground"
             >
-              Message Wendy on WhatsApp
+              <MessageCircle className="h-4 w-4" aria-hidden="true" />
+              Send receipt on WhatsApp
             </a>
-            <Link to="/menu" search={{}} className="rounded-sm border border-input px-5 py-3 text-sm font-semibold">
+            <Link
+              to="/menu"
+              search={{}}
+              className="rounded-sm border border-input px-5 py-3 text-sm font-semibold"
+            >
               Back to the menu
             </Link>
           </div>
@@ -128,49 +281,12 @@ function CheckoutPage() {
     <>
       <PageHeader
         eyebrow="Checkout"
-        title="Your details and your pickup slot."
-        lead="Fixed-price items are charged in full, custom cakes take a deposit, and quoted items are priced in your confirmation."
+        title="Your details, then how you'd like to pay."
+        lead="Confirm over WhatsApp with an itemised receipt, or pay by bank transfer and upload your slip."
       />
 
       <Section>
-        <form
-          className="grid gap-10 md:grid-cols-12"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            if (busy) return;
-            setBusy(true);
-            try {
-              const result = await submitOrder({
-                data: {
-                  customer_name: form.customer_name,
-                  phone: form.phone,
-                  email: form.email || undefined,
-                  pickup_date: form.pickup_date || undefined,
-                  pickup_window: form.pickup_window,
-                  fulfilment: form.fulfilment,
-                  delivery_area: form.fulfilment === "delivery" ? form.delivery_area : undefined,
-                  occasion: form.occasion || undefined,
-                  notes: form.notes || undefined,
-                  allergies: form.allergies || undefined,
-                  items: items.map((i) => ({
-                    slug: i.slug,
-                    quantity: i.quantity,
-                    options: i.options,
-                    notes: i.notes,
-                  })),
-                },
-              });
-              clear();
-              setDone({ reference: result.reference, dueNowCents: result.dueNowCents });
-            } catch (error) {
-              toast.error(
-                error instanceof Error ? error.message : "Something went wrong. Please try again.",
-              );
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
+        <form className="grid gap-10 md:grid-cols-12" onSubmit={handleSubmit}>
           <div className="space-y-6 md:col-span-7">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
@@ -298,10 +414,104 @@ function CheckoutPage() {
                 onChange={(e) => set("allergies", e.target.value)}
               />
             </div>
+
+            <div className="rounded-[1.5rem] border border-border bg-card p-5">
+              <h2 className="eyebrow text-muted-foreground">How you&rsquo;d like to pay</h2>
+              <Tabs
+                value={method}
+                onValueChange={(v) => setMethod(v as "whatsapp" | "bank_transfer")}
+                className="mt-4"
+              >
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="whatsapp" className="gap-2">
+                    <MessageCircle className="h-4 w-4" aria-hidden="true" />
+                    WhatsApp
+                  </TabsTrigger>
+                  <TabsTrigger value="bank_transfer" className="gap-2">
+                    <Landmark className="h-4 w-4" aria-hidden="true" />
+                    Bank transfer
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="whatsapp" className="mt-5 text-sm text-muted-foreground">
+                  We place the order and open WhatsApp with an itemised receipt already written out,
+                  so Wendy can confirm your date and send payment details.
+                </TabsContent>
+
+                <TabsContent value="bank_transfer" className="mt-5 space-y-4">
+                  <div className="rounded-[1rem] bg-secondary p-4 text-sm">
+                    <p className="font-semibold">{settings.bank_account_name}</p>
+                    <p className="text-muted-foreground">{settings.bank_name}</p>
+                    <p className="text-muted-foreground">Account {settings.bank_account_number}</p>
+                    <p className="mt-2 text-xs text-muted-foreground">{settings.bank_note}</p>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="payer">Name on the transfer</Label>
+                      <Input
+                        id="payer"
+                        maxLength={100}
+                        value={form.payer_name}
+                        onChange={(e) => set("payer_name", e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="tref">Transfer reference</Label>
+                      <Input
+                        id="tref"
+                        maxLength={80}
+                        value={form.transfer_reference}
+                        onChange={(e) => set("transfer_reference", e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="tdate">Date sent</Label>
+                    <Input
+                      id="tdate"
+                      type="date"
+                      value={form.transfer_date}
+                      onChange={(e) => set("transfer_date", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="slip">Payment slip (JPG, PNG, WEBP or PDF, max 5MB)</Label>
+                    <div className="flex items-center gap-3">
+                      <Upload className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                      <Input
+                        id="slip"
+                        type="file"
+                        accept={ALLOWED_SLIP_TYPES.join(",")}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] ?? null;
+                          if (!file) return setSlip(null);
+                          if (!ALLOWED_SLIP_TYPES.includes(file.type as never)) {
+                            toast.error("Upload a JPG, PNG, WEBP or PDF.");
+                            e.target.value = "";
+                            return setSlip(null);
+                          }
+                          if (file.size > MAX_SLIP_BYTES) {
+                            toast.error("That file is larger than 5MB.");
+                            e.target.value = "";
+                            return setSlip(null);
+                          }
+                          setSlip(file);
+                        }}
+                      />
+                    </div>
+                    {slip && (
+                      <p className="text-xs text-muted-foreground">
+                        {slip.name} · {(slip.size / 1024 / 1024).toFixed(2)}MB
+                      </p>
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </div>
           </div>
 
           <aside className="md:col-span-5">
-            <div className="rounded-[1.5rem] border border-border bg-secondary p-6">
+            <div className="rounded-[1.5rem] border border-border bg-secondary p-6 md:sticky md:top-28">
               <h2 className="eyebrow text-muted-foreground">Your order</h2>
               <ul className="mt-4 space-y-3 text-sm">
                 {items.map((item, i) => (
@@ -310,13 +520,13 @@ function CheckoutPage() {
                       {item.quantity} × {item.name}
                     </span>
                     <span className="shrink-0 text-muted-foreground">
-                      {item.pricing_mode === "quote" ? "Quoted" : ""}
+                      {lineDueCents(item) > 0 ? formatMoney(lineDueCents(item)) : "Quoted"}
                     </span>
                   </li>
                 ))}
               </ul>
               <div className="mt-5 flex justify-between border-t border-border pt-4">
-                <span className="text-sm font-semibold">Due at confirmation</span>
+                <span className="text-sm font-semibold">Subtotal</span>
                 <span className="font-display text-xl">{formatMoney(dueNowCents)}</span>
               </div>
               {hasQuoteItems && (
@@ -329,10 +539,14 @@ function CheckoutPage() {
                 disabled={busy}
                 className="mt-6 w-full rounded-sm bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
               >
-                {busy ? "Placing your order…" : "Place order"}
+                {busy
+                  ? "Placing your order…"
+                  : method === "whatsapp"
+                    ? "Place order & open WhatsApp"
+                    : "Place order & submit slip"}
               </button>
               <p className="mt-3 text-xs text-muted-foreground">
-                Card payment is sent as a secure link with your confirmation.
+                Orders start as Not Paid until Wendy verifies payment.
               </p>
             </div>
           </aside>
