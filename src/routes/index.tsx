@@ -39,14 +39,11 @@ const STEPS = [
 ];
 
 function Index() {
-  const signature = PRODUCTS.filter((p) =>
-    [
-      "signature-6-inch-celebration-cake",
-      "nigerian-meat-pies",
-      "cupcakes-set-of-twelve",
-      "cake-loaves",
-    ].includes(p.slug),
-  );
+  const { data, isPending } = useQuery(catalogQueryOptions);
+  const products = data?.products ?? [];
+  const categories = data?.categories ?? [];
+  const signature = products.slice(0, 4);
+
 
   return (
     <>
