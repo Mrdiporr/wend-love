@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCart, lineDueCents } from "@/lib/cart";
 import { catalogQueryOptions, formatMoney, FALLBACK_SETTINGS } from "@/lib/shop";
-import { placeOrder } from "@/lib/orders.functions";
+import { placeOrder, type PlaceOrderInput } from "@/lib/orders.functions";
 
 const TITLE = "Checkout — Wendy's Bakehouse, Cakes in Toronto";
 const DESC =
