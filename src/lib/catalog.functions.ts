@@ -29,7 +29,7 @@ export const getCatalog = createServerFn({ method: "GET" }).handler(async () => 
     supabase.from("products").select("*").eq("available", true).order("sort_order"),
     supabase
       .from("settings")
-      .select("bank_account_name, bank_account_number, bank_name, bank_note, whatsapp_number")
+      .select("whatsapp_number")
       .limit(1)
       .maybeSingle(),
   ]);
@@ -42,4 +42,15 @@ export const getCatalog = createServerFn({ method: "GET" }).handler(async () => 
     products: prods.data ?? [],
     settings: settings.data ?? null,
   };
+});
+
+/** Bank transfer details. Kept out of the public Data API and served only here. */
+export const getBankDetails = createServerFn({ method: "GET" }).handler(async () => {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await supabaseAdmin
+    .from("settings")
+    .select("bank_account_name, bank_account_number, bank_name, bank_note")
+    .limit(1)
+    .maybeSingle();
+  return data ?? null;
 });

@@ -4,12 +4,9 @@ import { z } from "zod";
 
 async function assertAdmin(context: { supabase: unknown; userId: string }) {
   const supabase = context.supabase as {
-    rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+    rpc: (fn: string) => Promise<{ data: unknown; error: unknown }>;
   };
-  const { data } = await supabase.rpc("has_role", {
-    _user_id: context.userId,
-    _role: "admin",
-  });
+  const { data } = await supabase.rpc("is_admin");
   if (data !== true) throw new Error("Forbidden");
 }
 
