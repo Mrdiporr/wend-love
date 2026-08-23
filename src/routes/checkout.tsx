@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCart, lineDueCents } from "@/lib/cart";
 import { catalogQueryOptions, formatMoney, FALLBACK_SETTINGS } from "@/lib/shop";
-import { placeOrder } from "@/lib/orders.functions";
+import { placeOrder, type PlaceOrderInput } from "@/lib/orders.functions";
 
 const TITLE = "Checkout — Wendy's Bakehouse, Cakes in Toronto";
 const DESC =
@@ -141,43 +141,40 @@ function CheckoutPage() {
 
     setBusy(true);
     try {
-      let slipPayload: { filename: string; content_type: string; data_base64: string } | undefined;
+      const payload: PlaceOrderInput = {
+        customer_name: form.customer_name,
+        phone: form.phone,
+        email: form.email || undefined,
+        pickup_date: form.pickup_date || undefined,
+        pickup_window: form.pickup_window,
+        fulfilment: form.fulfilment,
+        delivery_area: form.fulfilment === "delivery" ? form.delivery_area : undefined,
+        occasion: form.occasion || undefined,
+        notes: form.notes || undefined,
+        allergies: form.allergies || undefined,
+        checkout_method: method,
+        payer_name: method === "bank_transfer" ? form.payer_name : undefined,
+        transfer_reference:
+          method === "bank_transfer" ? form.transfer_reference || undefined : undefined,
+        transfer_date: method === "bank_transfer" ? form.transfer_date || undefined : undefined,
+        items: items.map((i) => ({
+          slug: i.slug,
+          quantity: i.quantity,
+          options: i.options,
+          notes: i.notes,
+        })),
+      };
+
       if (method === "bank_transfer" && slip) {
-        slipPayload = {
+        payload.slip = {
           filename: slip.name,
-          content_type: slip.type,
+          content_type: slip.type as NonNullable<PlaceOrderInput["slip"]>["content_type"],
           data_base64: await readFileAsBase64(slip),
         };
       }
 
-      const result = await submitOrder({
-        data: {
-          customer_name: form.customer_name,
-          phone: form.phone,
-          email: form.email || undefined,
-          pickup_date: form.pickup_date || undefined,
-          pickup_window: form.pickup_window,
-          fulfilment: form.fulfilment,
-          delivery_area: form.fulfilment === "delivery" ? form.delivery_area : undefined,
-          occasion: form.occasion || undefined,
-          notes: form.notes || undefined,
-          allergies: form.allergies || undefined,
-          checkout_method: method,
-          payer_name: method === "bank_transfer" ? form.payer_name : undefined,
-          transfer_reference:
-            method === "bank_transfer" ? form.transfer_reference || undefined : undefined,
-          transfer_date: method === "bank_transfer" ? form.transfer_date || undefined : undefined,
-          ...(slipPayload
-            ? { slip: slipPayload as NonNullable<Parameters<typeof placeOrder>[0]> extends never ? never : typeof slipPayload }
-            : {}),
-          items: items.map((i) => ({
-            slug: i.slug,
-            quantity: i.quantity,
-            options: i.options,
-            notes: i.notes,
-          })),
-        } as Parameters<typeof submitOrder>[0]["data"],
-      });
+      const result = await submitOrder({ data: payload });
+
 
       const waLink = buildWhatsAppLink(result.reference);
       clear();
