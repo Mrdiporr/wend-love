@@ -144,7 +144,7 @@ export function AdminOrders({ paymentsOnly = false }: { paymentsOnly?: boolean }
                 <TableCell className="hidden lg:table-cell">
                   <Select
                     value={o.status}
-                    onValueChange={(v) => mutate.mutate({ id: o.id, status: v })}
+                    onValueChange={(v) => mutate.mutate({ id: o.id, status: v as (typeof STATUSES)[number] })}
                   >
                     <SelectTrigger className="h-8 w-36">
                       <SelectValue />
@@ -162,7 +162,7 @@ export function AdminOrders({ paymentsOnly = false }: { paymentsOnly?: boolean }
                   <div className="flex justify-end gap-2">
                     <Select
                       value={o.payment_status}
-                      onValueChange={(v) => mutate.mutate({ id: o.id, payment_status: v })}
+                      onValueChange={(v) => mutate.mutate({ id: o.id, payment_status: v as (typeof PAYMENT_STATUSES)[number] })}
                     >
                       <SelectTrigger className="h-8 w-32">
                         <SelectValue />
