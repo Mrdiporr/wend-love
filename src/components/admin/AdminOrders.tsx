@@ -57,8 +57,12 @@ export function AdminOrders({ paymentsOnly = false }: { paymentsOnly?: boolean }
   const [slips, setSlips] = useState<Record<string, string>>({});
 
   const mutate = useMutation({
-    mutationFn: (input: { id: string; status?: string; payment_status?: string }) =>
-      updateOrder({ data: input as Parameters<typeof adminUpdateOrder>[0]["data"] }),
+    mutationFn: (input: {
+      id: string;
+      status?: (typeof STATUSES)[number];
+      payment_status?: (typeof PAYMENT_STATUSES)[number];
+    }) => updateOrder({ data: input }),
+
     onSuccess: () => {
       toast.success("Order updated.");
       void queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
