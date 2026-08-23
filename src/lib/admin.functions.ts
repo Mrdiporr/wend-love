@@ -57,13 +57,14 @@ export const adminUpdateOrder = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const patch: Record<string, string> = {};
-    if (data.status) patch["status"] = data.status;
-    if (data.payment_status) patch["payment_status"] = data.payment_status;
+    const patch: { status?: string; payment_status?: string } = {};
+    if (data.status) patch.status = data.status;
+    if (data.payment_status) patch.payment_status = data.payment_status;
     const { error } = await supabaseAdmin.from("orders").update(patch).eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
 
 /** Full product list, including unavailable items. */
 export const adminListProducts = createServerFn({ method: "GET" })
