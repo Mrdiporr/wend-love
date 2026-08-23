@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CartRouteImport } from './routes/cart'
@@ -17,6 +18,7 @@ import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as OrderRouteImport } from './routes/order'
 import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as MenuIndexRouteImport } from './routes/menu.index'
 import { Route as MenuSlugRouteImport } from './routes/menu.$slug'
 import { Route as ApiPublicProductImageSplatRouteImport } from './routes/api/public/product-image/$'
@@ -24,6 +26,10 @@ import { Route as ApiPublicProductImageSplatRouteImport } from './routes/api/pub
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AboutRoute = AboutRouteImport.update({
@@ -61,6 +67,11 @@ const PricingRoute = PricingRouteImport.update({
   path: '/pricing',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const MenuIndexRoute = MenuIndexRouteImport.update({
   id: '/menu/',
   path: '/menu/',
@@ -87,6 +98,7 @@ export interface FileRoutesByFullPath {
   '/contact': typeof ContactRoute
   '/order': typeof OrderRoute
   '/pricing': typeof PricingRoute
+  '/admin': typeof AuthenticatedAdminRoute
   '/menu/$slug': typeof MenuSlugRoute
   '/menu/': typeof MenuIndexRoute
   '/api/public/product-image/$': typeof ApiPublicProductImageSplatRoute
@@ -100,6 +112,7 @@ export interface FileRoutesByTo {
   '/contact': typeof ContactRoute
   '/order': typeof OrderRoute
   '/pricing': typeof PricingRoute
+  '/admin': typeof AuthenticatedAdminRoute
   '/menu/$slug': typeof MenuSlugRoute
   '/menu': typeof MenuIndexRoute
   '/api/public/product-image/$': typeof ApiPublicProductImageSplatRoute
@@ -107,6 +120,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
   '/cart': typeof CartRoute
@@ -114,6 +128,7 @@ export interface FileRoutesById {
   '/contact': typeof ContactRoute
   '/order': typeof OrderRoute
   '/pricing': typeof PricingRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/menu/$slug': typeof MenuSlugRoute
   '/menu/': typeof MenuIndexRoute
   '/api/public/product-image/$': typeof ApiPublicProductImageSplatRoute
@@ -129,6 +144,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/order'
     | '/pricing'
+    | '/admin'
     | '/menu/$slug'
     | '/menu/'
     | '/api/public/product-image/$'
@@ -142,12 +158,14 @@ export interface FileRouteTypes {
     | '/contact'
     | '/order'
     | '/pricing'
+    | '/admin'
     | '/menu/$slug'
     | '/menu'
     | '/api/public/product-image/$'
   id:
     | '__root__'
     | '/'
+    | '/_authenticated'
     | '/about'
     | '/auth'
     | '/cart'
@@ -155,6 +173,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/order'
     | '/pricing'
+    | '/_authenticated/admin'
     | '/menu/$slug'
     | '/menu/'
     | '/api/public/product-image/$'
@@ -162,6 +181,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AboutRoute: typeof AboutRoute
   AuthRoute: typeof AuthRoute
   CartRoute: typeof CartRoute
@@ -181,6 +201,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/about': {
@@ -232,6 +259,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PricingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/menu/': {
       id: '/menu/'
       path: '/menu'
@@ -256,8 +290,20 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminRoute: AuthenticatedAdminRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AboutRoute: AboutRoute,
   AuthRoute: AuthRoute,
   CartRoute: CartRoute,
