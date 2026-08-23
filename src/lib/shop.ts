@@ -1,5 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
-import { getCatalog } from "@/lib/catalog.functions";
+import { getCatalog, getBankDetails } from "@/lib/catalog.functions";
 
 import heroCake from "@/assets/hero-cake.jpg";
 import meatPies from "@/assets/meat-pies.jpg";
@@ -43,19 +43,25 @@ export type ShopProduct = {
 };
 
 export type ShopSettings = {
-  bank_account_name: string;
-  bank_account_number: string;
-  bank_name: string;
-  bank_note: string;
   whatsapp_number: string;
 };
 
 export const FALLBACK_SETTINGS: ShopSettings = {
+  whatsapp_number: "+1 647 620 2518",
+};
+
+export type BankDetails = {
+  bank_account_name: string;
+  bank_account_number: string;
+  bank_name: string;
+  bank_note: string;
+};
+
+export const FALLBACK_BANK_DETAILS: BankDetails = {
   bank_account_name: "Wendy's Bakehouse",
   bank_account_number: "0000000000",
   bank_name: "Bank name pending",
   bank_note: "Use your order reference as the transfer description.",
-  whatsapp_number: "+1 647 620 2518",
 };
 
 const BUNDLED: Record<string, string> = {
@@ -152,6 +158,12 @@ export async function fetchCatalog(): Promise<{
     settings: data.settings ?? FALLBACK_SETTINGS,
   };
 }
+
+export const bankDetailsQueryOptions = queryOptions({
+  queryKey: ["bank-details"],
+  queryFn: async (): Promise<BankDetails> => (await getBankDetails()) ?? FALLBACK_BANK_DETAILS,
+  staleTime: 60_000,
+});
 
 export const catalogQueryOptions = queryOptions({
   queryKey: ["catalog"],

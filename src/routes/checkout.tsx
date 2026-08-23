@@ -10,7 +10,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCart, lineDueCents } from "@/lib/cart";
-import { catalogQueryOptions, formatMoney, FALLBACK_SETTINGS } from "@/lib/shop";
+import {
+  catalogQueryOptions,
+  bankDetailsQueryOptions,
+  formatMoney,
+  FALLBACK_SETTINGS,
+  FALLBACK_BANK_DETAILS,
+} from "@/lib/shop";
 import { placeOrder, type PlaceOrderInput } from "@/lib/orders.functions";
 
 const TITLE = "Checkout — Wendy's Bakehouse, Cakes in Toronto";
@@ -69,6 +75,8 @@ function CheckoutPage() {
   const submitOrder = useServerFn(placeOrder);
   const { data: catalog } = useQuery(catalogQueryOptions);
   const settings = catalog?.settings ?? FALLBACK_SETTINGS;
+  const { data: bankData } = useQuery(bankDetailsQueryOptions);
+  const bank = bankData ?? FALLBACK_BANK_DETAILS;
 
   const [method, setMethod] = useState<"whatsapp" | "bank_transfer">("whatsapp");
   const [busy, setBusy] = useState(false);
@@ -437,10 +445,10 @@ function CheckoutPage() {
 
                 <TabsContent value="bank_transfer" className="mt-5 space-y-4">
                   <div className="rounded-[1rem] bg-secondary p-4 text-sm">
-                    <p className="font-semibold">{settings.bank_account_name}</p>
-                    <p className="text-muted-foreground">{settings.bank_name}</p>
-                    <p className="text-muted-foreground">Account {settings.bank_account_number}</p>
-                    <p className="mt-2 text-xs text-muted-foreground">{settings.bank_note}</p>
+                    <p className="font-semibold">{bank.bank_account_name}</p>
+                    <p className="text-muted-foreground">{bank.bank_name}</p>
+                    <p className="text-muted-foreground">Account {bank.bank_account_number}</p>
+                    <p className="mt-2 text-xs text-muted-foreground">{bank.bank_note}</p>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
