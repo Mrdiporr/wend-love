@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
+import { z } from "zod";
 import type { Database } from "@/integrations/supabase/types";
 
 function publicClient() {
@@ -27,11 +28,7 @@ export const getCatalog = createServerFn({ method: "GET" }).handler(async () => 
   const [cats, prods, settings] = await Promise.all([
     supabase.from("categories").select("*").eq("visible", true).order("sort_order"),
     supabase.from("products").select("*").eq("available", true).order("sort_order"),
-    supabase
-      .from("settings")
-      .select("whatsapp_number")
-      .limit(1)
-      .maybeSingle(),
+    supabase.from("settings").select("whatsapp_number").limit(1).maybeSingle(),
   ]);
 
   if (cats.error) throw new Error(cats.error.message);
@@ -44,13 +41,29 @@ export const getCatalog = createServerFn({ method: "GET" }).handler(async () => 
   };
 });
 
-/** Bank transfer details. Kept out of the public Data API and served only here. */
-export const getBankDetails = createServerFn({ method: "GET" }).handler(async () => {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data } = await supabaseAdmin
-    .from("settings")
-    .select("bank_account_name, bank_account_number, bank_name, bank_note")
-    .limit(1)
-    .maybeSingle();
-  return data ?? null;
-});
+/**
+ * Bank transfer details. Kept out of the public Data API and returned only for
+ * a real checkout context — the caller must name at least one orderable item.
+ */
+export const getBankDetails = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ slugs: z.array(z.string().min(1).max(120)).min(1).max(30) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { count } = await supabaseAdmin
+      .from("products")
+      .select("id", { count: "exact", head: true })
+      .in("slug", data.slugs)
+      .eq("available", true);
+
+    if (!count) return null;
+
+    const { data: settings } = await supabaseAdmin
+      .from("settings")
+      .select("bank_account_name, bank_account_number, bank_name, bank_note")
+      .limit(1)
+      .maybeSingle();
+    return settings ?? null;
+  });

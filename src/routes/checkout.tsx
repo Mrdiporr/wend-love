@@ -75,7 +75,7 @@ function CheckoutPage() {
   const submitOrder = useServerFn(placeOrder);
   const { data: catalog } = useQuery(catalogQueryOptions);
   const settings = catalog?.settings ?? FALLBACK_SETTINGS;
-  const { data: bankData } = useQuery(bankDetailsQueryOptions);
+  const { data: bankData } = useQuery(bankDetailsQueryOptions(items.map((i) => i.slug)));
   const bank = bankData ?? FALLBACK_BANK_DETAILS;
 
   const [method, setMethod] = useState<"whatsapp" | "bank_transfer">("whatsapp");
