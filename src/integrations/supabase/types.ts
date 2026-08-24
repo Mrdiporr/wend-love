@@ -225,6 +225,7 @@ export type Database = {
           short: string
           slug: string
           sort_order: number
+          status: string
           updated_at: string
         }
         Insert: {
@@ -248,6 +249,7 @@ export type Database = {
           short?: string
           slug: string
           sort_order?: number
+          status?: string
           updated_at?: string
         }
         Update: {
@@ -271,6 +273,7 @@ export type Database = {
           short?: string
           slug?: string
           sort_order?: number
+          status?: string
           updated_at?: string
         }
         Relationships: [
@@ -345,6 +348,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_order: {
+        Args: { _items: Json; _order: Json }
+        Returns: {
+          id: string
+          reference: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -353,6 +363,7 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
+      is_staff: { Args: never; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "staff"
