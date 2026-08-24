@@ -46,6 +46,21 @@ function decodeBase64(data: string): Uint8Array {
   return bytes;
 }
 
+/** Reads a lead time such as "5 days" or "2 weeks" into whole days. */
+export function leadTimeDays(text: string | null | undefined): number {
+  if (!text) return 0;
+  const match = /(\d+)\s*(day|week)/i.exec(text);
+  if (!match) return 0;
+  const n = Number(match[1]);
+  return /week/i.test(match[2] ?? "") ? n * 7 : n;
+}
+
+function daysBetween(fromISO: string, toISO: string): number {
+  const a = Date.parse(`${fromISO}T00:00:00Z`);
+  const b = Date.parse(`${toISO}T00:00:00Z`);
+  return Math.round((b - a) / 86_400_000);
+}
+
 export const placeOrder = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => orderSchema.parse(data))
   .handler(async ({ data }) => {
@@ -54,7 +69,7 @@ export const placeOrder = createServerFn({ method: "POST" })
     const slugs = [...new Set(data.items.map((i) => i.slug))];
     const { data: products, error: productError } = await supabaseAdmin
       .from("products")
-      .select("id, slug, name, pricing_mode, price_cents, deposit_cents, available")
+      .select("id, slug, name, pricing_mode, price_cents, deposit_cents, status, lead_time")
       .in("slug", slugs);
 
     if (productError) throw new Error("Could not load the menu right now. Please try again.");
@@ -62,8 +77,24 @@ export const placeOrder = createServerFn({ method: "POST" })
     const bySlug = new Map((products ?? []).map((p) => [p.slug, p]));
     for (const item of data.items) {
       const product = bySlug.get(item.slug);
-      if (!product || !product.available) {
+      if (!product || product.status !== "available") {
         throw new Error(`"${item.slug}" is no longer available. Please remove it and try again.`);
+      }
+    }
+
+    // Lead time is enforced server-side from the product records.
+    if (data.pickup_date) {
+      const today = new Date().toISOString().slice(0, 10);
+      const notice = daysBetween(today, data.pickup_date);
+      if (notice < 0) throw new Error("Please choose a collection date in the future.");
+      const required = Math.max(
+        0,
+        ...data.items.map((i) => leadTimeDays(bySlug.get(i.slug)?.lead_time)),
+      );
+      if (notice < required) {
+        throw new Error(
+          `Those items need at least ${required} day${required === 1 ? "" : "s"} notice. Please pick a later date.`,
+        );
       }
     }
 
@@ -100,9 +131,11 @@ export const placeOrder = createServerFn({ method: "POST" })
       100000 + Math.random() * 900000,
     )}`;
 
-    const { data: order, error: orderError } = await supabaseAdmin
-      .from("orders")
-      .insert({
+    const isTransfer = data.checkout_method === "bank_transfer";
+
+    // Order + items are written in one database transaction.
+    const { data: created, error: orderError } = await supabaseAdmin.rpc("create_order", {
+      _order: {
         reference,
         customer_name: data.customer_name,
         email: data.email || null,
@@ -123,23 +156,16 @@ export const placeOrder = createServerFn({ method: "POST" })
         payer_name: data.payer_name || null,
         transfer_reference: data.transfer_reference || null,
         transfer_date: data.transfer_date || null,
-        payment_provider: data.checkout_method === "bank_transfer" ? "bank_transfer" : "whatsapp",
-        payment_status: "not_paid",
-      })
-      .select("id, reference")
-      .single();
+        payment_provider: isTransfer ? "bank_transfer" : "whatsapp",
+        payment_status: isTransfer ? "pending_verification" : "not_paid",
+      },
+      _items: lines,
+    });
 
+    const order = Array.isArray(created) ? created[0] : created;
     if (orderError || !order) throw new Error("We could not save your order. Please try again.");
 
-    const { error: itemsError } = await supabaseAdmin
-      .from("order_items")
-      .insert(lines.map((l) => ({ ...l, order_id: order.id })));
-
-    if (itemsError) {
-      await supabaseAdmin.from("orders").delete().eq("id", order.id);
-      throw new Error("We could not save your order items. Please try again.");
-    }
-
+    let slipUploaded = false;
     if (data.slip) {
       const bytes = decodeBase64(data.slip.data_base64);
       if (bytes.byteLength > MAX_SLIP_BYTES) {
@@ -150,7 +176,14 @@ export const placeOrder = createServerFn({ method: "POST" })
       const { error: uploadError } = await supabaseAdmin.storage
         .from("payment-slips")
         .upload(path, bytes, { contentType: data.slip.content_type, upsert: true });
-      if (!uploadError) {
+      if (uploadError) {
+        // The order stands; it is simply flagged as missing evidence.
+        await supabaseAdmin
+          .from("orders")
+          .update({ notes: [data.notes, "[Payment slip upload failed]"].filter(Boolean).join("\n") })
+          .eq("id", order.id);
+      } else {
+        slipUploaded = true;
         await supabaseAdmin.from("orders").update({ slip_path: path }).eq("id", order.id);
       }
     }
@@ -160,6 +193,7 @@ export const placeOrder = createServerFn({ method: "POST" })
       dueNowCents: dueNow,
       subtotalCents: subtotal,
       hasQuoteItems,
+      slipUploaded,
       lines: lines.map((l) => ({
         name: l.name,
         quantity: l.quantity,
