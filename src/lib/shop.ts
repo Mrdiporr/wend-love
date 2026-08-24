@@ -159,11 +159,16 @@ export async function fetchCatalog(): Promise<{
   };
 }
 
-export const bankDetailsQueryOptions = queryOptions({
-  queryKey: ["bank-details"],
-  queryFn: async (): Promise<BankDetails> => (await getBankDetails()) ?? FALLBACK_BANK_DETAILS,
-  staleTime: 60_000,
-});
+/** Bank details are only served for a real basket, so the slugs are required. */
+export function bankDetailsQueryOptions(slugs: string[]) {
+  return queryOptions({
+    queryKey: ["bank-details", [...slugs].sort()],
+    enabled: slugs.length > 0,
+    queryFn: async (): Promise<BankDetails> =>
+      (await getBankDetails({ data: { slugs } })) ?? FALLBACK_BANK_DETAILS,
+    staleTime: 60_000,
+  });
+}
 
 export const catalogQueryOptions = queryOptions({
   queryKey: ["catalog"],
