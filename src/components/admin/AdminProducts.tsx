@@ -1,15 +1,14 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { adminDeleteProduct, adminListProducts, adminSaveProduct } from "@/lib/admin.functions";
 import { formatMoney, imageSrc } from "@/lib/shop";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -23,6 +22,8 @@ import {
 
 type Catalog = Awaited<ReturnType<typeof adminListProducts>>;
 type ProductRow = Catalog["products"][number];
+type Status = "available" | "unavailable" | "archived";
+type PricingMode = "fixed" | "deposit" | "quote";
 
 type Draft = {
   id?: string;
@@ -31,16 +32,21 @@ type Draft = {
   category_id: string | null;
   short: string;
   description: string;
+  pricing_mode: PricingMode;
   price: string;
   deposit: string;
+  price_band: string;
+  price_note: string;
   lead_time: string;
   serves: string;
+  includes: string;
   image_url: string;
-  available: boolean;
+  status: Status;
   sort_order: number;
 };
 
 function toDraft(p?: ProductRow): Draft {
+  const includes = Array.isArray(p?.includes) ? (p.includes as string[]) : [];
   return {
     ...(p ? { id: p.id } : {}),
     slug: p?.slug ?? "",
@@ -48,12 +54,16 @@ function toDraft(p?: ProductRow): Draft {
     category_id: p?.category_id ?? null,
     short: p?.short ?? "",
     description: p?.description ?? "",
+    pricing_mode: (p?.pricing_mode as PricingMode) ?? "fixed",
     price: p?.price_cents != null ? (p.price_cents / 100).toString() : "",
     deposit: p?.deposit_cents != null ? (p.deposit_cents / 100).toString() : "",
+    price_band: p?.price_band ?? "",
+    price_note: p?.price_note ?? "",
     lead_time: p?.lead_time ?? "",
     serves: p?.serves ?? "",
+    includes: includes.join("\n"),
     image_url: p?.image_url ?? "",
-    available: p?.available ?? true,
+    status: (p?.status as Status) ?? "available",
     sort_order: p?.sort_order ?? 0,
   };
 }
@@ -64,6 +74,12 @@ function toCents(value: string): number | null {
   const n = Number(trimmed);
   return Number.isFinite(n) ? Math.round(n * 100) : null;
 }
+
+const STATUS_TONE: Record<Status, "default" | "secondary" | "outline"> = {
+  available: "default",
+  unavailable: "secondary",
+  archived: "outline",
+};
 
 export function AdminProducts() {
   const listProducts = useServerFn(adminListProducts);
@@ -77,9 +93,11 @@ export function AdminProducts() {
   });
 
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<Status | "all">("all");
 
   const invalidate = () => {
-    void queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
+    void queryClient.invalidateQueries({ queryKey: ["admin"] });
     void queryClient.invalidateQueries({ queryKey: ["catalog"] });
   };
 
@@ -93,12 +111,20 @@ export function AdminProducts() {
           category_id: d.category_id,
           short: d.short.trim(),
           description: d.description.trim(),
+          pricing_mode: d.pricing_mode,
           price_cents: toCents(d.price),
           deposit_cents: toCents(d.deposit),
+          price_band: d.price_band.trim() || null,
+          price_note: d.price_note.trim() || null,
           lead_time: d.lead_time.trim(),
           serves: d.serves.trim() || null,
+          options: [],
+          includes: d.includes
+            .split("\n")
+            .map((l) => l.trim())
+            .filter(Boolean),
           image_url: d.image_url.trim() || null,
-          available: d.available,
+          status: d.status,
           sort_order: d.sort_order,
         },
       }),
@@ -119,60 +145,117 @@ export function AdminProducts() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const categories = data?.categories ?? [];
+
+  const visible = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return (data?.products ?? []).filter((p) => {
+      if (statusFilter !== "all" && p.status !== statusFilter) return false;
+      if (!term) return true;
+      return `${p.name} ${p.slug}`.toLowerCase().includes(term);
+    });
+  }, [data?.products, search, statusFilter]);
+
   if (isPending) {
     return (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-48 w-full rounded-[1rem]" />
+          <Skeleton key={i} className="h-64 w-full rounded-[1rem]" />
         ))}
       </div>
     );
   }
 
-  const categories = data?.categories ?? [];
-
   return (
     <>
-      <div className="mb-5 flex justify-end">
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <div className="relative min-w-[200px] flex-1">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <Input
+            className="pl-9"
+            placeholder="Search cakes"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as Status | "all")}>
+          <SelectTrigger className="w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            <SelectItem value="available">Available</SelectItem>
+            <SelectItem value="unavailable">Unavailable</SelectItem>
+            <SelectItem value="archived">Archived</SelectItem>
+          </SelectContent>
+        </Select>
         <Button onClick={() => setDraft(toDraft())}>
           <Plus className="mr-2 h-4 w-4" aria-hidden="true" /> New product
         </Button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {(data?.products ?? []).map((p) => (
-          <div key={p.id} className="rounded-[1rem] border border-border bg-card p-4">
-            <img
-              src={imageSrc(p)}
-              alt=""
-              className="aspect-[4/3] w-full rounded-[0.75rem] object-cover"
-            />
-            <div className="mt-3 flex items-start justify-between gap-2">
-              <h3 className="font-display text-lg leading-tight">{p.name}</h3>
-              <Badge variant={p.available ? "default" : "outline"}>
-                {p.available ? "Live" : "Hidden"}
-              </Badge>
+      {visible.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Nothing matches those filters.</p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {visible.map((p) => (
+            <div key={p.id} className="rounded-[1rem] border border-border bg-card p-4">
+              <img
+                src={imageSrc(p)}
+                alt=""
+                loading="lazy"
+                className="aspect-[4/3] w-full rounded-[0.75rem] object-cover"
+              />
+              <div className="mt-3 flex items-start justify-between gap-2">
+                <h3 className="font-display text-lg leading-tight">{p.name}</h3>
+                <Badge variant={STATUS_TONE[(p.status as Status) ?? "available"]}>{p.status}</Badge>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {p.pricing_mode === "quote"
+                  ? "Quoted"
+                  : p.pricing_mode === "deposit"
+                    ? `${formatMoney(p.deposit_cents ?? 0)} deposit`
+                    : formatMoney(p.price_cents ?? 0)}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => setDraft(toDraft(p))}>
+                  Edit
+                </Button>
+                {p.status !== "archived" ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => save.mutate({ ...toDraft(p), status: "archived" })}
+                  >
+                    Archive
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => save.mutate({ ...toDraft(p), status: "available" })}
+                  >
+                    Restore
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-destructive"
+                  onClick={() => {
+                    if (confirm(`Delete ${p.name}? Archive is usually safer.`)) remove.mutate(p.id);
+                  }}
+                >
+                  Delete
+                </Button>
+              </div>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {p.price_cents != null ? formatMoney(p.price_cents) : "Quoted"}
-            </p>
-            <div className="mt-3 flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => setDraft(toDraft(p))}>
-                Edit
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  if (confirm(`Remove ${p.name}?`)) remove.mutate(p.id);
-                }}
-              >
-                Delete
-              </Button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       <Dialog open={!!draft} onOpenChange={(open) => !open && setDraft(null)}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
@@ -207,7 +290,9 @@ export function AdminProducts() {
                 <Field label="Collection">
                   <Select
                     value={draft.category_id ?? "none"}
-                    onValueChange={(v) => setDraft({ ...draft, category_id: v === "none" ? null : v })}
+                    onValueChange={(v) =>
+                      setDraft({ ...draft, category_id: v === "none" ? null : v })
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -235,10 +320,26 @@ export function AdminProducts() {
                     onChange={(e) => setDraft({ ...draft, description: e.target.value })}
                   />
                 </Field>
+                <Field label="Pricing">
+                  <Select
+                    value={draft.pricing_mode}
+                    onValueChange={(v) => setDraft({ ...draft, pricing_mode: v as PricingMode })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="fixed">Fixed price</SelectItem>
+                      <SelectItem value="deposit">Deposit to book</SelectItem>
+                      <SelectItem value="quote">Quote only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
                 <div className="grid grid-cols-2 gap-4">
-                  <Field label="Price (CAD, blank = quoted)">
+                  <Field label="Price (CAD)">
                     <Input
                       inputMode="decimal"
+                      disabled={draft.pricing_mode === "quote"}
                       value={draft.price}
                       onChange={(e) => setDraft({ ...draft, price: e.target.value })}
                     />
@@ -246,13 +347,28 @@ export function AdminProducts() {
                   <Field label="Deposit (CAD)">
                     <Input
                       inputMode="decimal"
+                      disabled={draft.pricing_mode !== "deposit"}
                       value={draft.deposit}
                       onChange={(e) => setDraft({ ...draft, deposit: e.target.value })}
                     />
                   </Field>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <Field label="Lead time">
+                  <Field label="Price band">
+                    <Input
+                      value={draft.price_band}
+                      onChange={(e) => setDraft({ ...draft, price_band: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Price note">
+                    <Input
+                      value={draft.price_note}
+                      onChange={(e) => setDraft({ ...draft, price_note: e.target.value })}
+                    />
+                  </Field>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Lead time (e.g. 5 days)">
                     <Input
                       value={draft.lead_time}
                       onChange={(e) => setDraft({ ...draft, lead_time: e.target.value })}
@@ -265,13 +381,20 @@ export function AdminProducts() {
                     />
                   </Field>
                 </div>
+                <Field label="Includes (one per line)">
+                  <Textarea
+                    rows={3}
+                    value={draft.includes}
+                    onChange={(e) => setDraft({ ...draft, includes: e.target.value })}
+                  />
+                </Field>
                 <Field label="Image URL">
                   <Input
                     value={draft.image_url}
                     onChange={(e) => setDraft({ ...draft, image_url: e.target.value })}
                   />
                 </Field>
-                <div className="grid grid-cols-2 items-end gap-4">
+                <div className="grid grid-cols-2 gap-4">
                   <Field label="Sort order">
                     <Input
                       type="number"
@@ -281,13 +404,21 @@ export function AdminProducts() {
                       }
                     />
                   </Field>
-                  <label className="flex items-center gap-3 pb-2 text-sm font-semibold">
-                    <Switch
-                      checked={draft.available}
-                      onCheckedChange={(v) => setDraft({ ...draft, available: v })}
-                    />
-                    Visible on the site
-                  </label>
+                  <Field label="Status">
+                    <Select
+                      value={draft.status}
+                      onValueChange={(v) => setDraft({ ...draft, status: v as Status })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="available">Available</SelectItem>
+                        <SelectItem value="unavailable">Unavailable</SelectItem>
+                        <SelectItem value="archived">Archived</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
                 </div>
                 <Button type="submit" disabled={save.isPending} className="w-full">
                   {save.isPending ? "Saving…" : "Save product"}
