@@ -1,12 +1,22 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { FileText, Loader2 } from "lucide-react";
+import { FileText, Loader2, Search } from "lucide-react";
 import { adminListOrders, adminSlipUrl, adminUpdateOrder } from "@/lib/admin.functions";
+import {
+  ORDER_STATUSES,
+  PAYMENT_STATUSES,
+  nextOrderStatuses,
+  nextPaymentStatuses,
+  statusLabel,
+  type OrderStatus,
+  type PaymentStatus,
+} from "@/lib/order-status";
 import { formatMoney } from "@/lib/shop";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -31,14 +41,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const STATUSES = ["new", "confirmed", "baking", "ready", "collected", "cancelled"] as const;
-const PAYMENT_STATUSES = ["not_paid", "paid", "refunded"] as const;
-
 type OrderRow = Awaited<ReturnType<typeof adminListOrders>>[number];
 
 function paymentTone(status: string) {
   if (status === "paid") return "default" as const;
   if (status === "refunded") return "outline" as const;
+  if (status === "pending_verification") return "secondary" as const;
   return "destructive" as const;
 }
 
@@ -48,26 +56,29 @@ export function AdminOrders({ paymentsOnly = false }: { paymentsOnly?: boolean }
   const slipUrl = useServerFn(adminSlipUrl);
   const queryClient = useQueryClient();
 
-  const { data, isPending } = useQuery({
+  const { data, isPending, isError, error, refetch } = useQuery({
     queryKey: ["admin", "orders"],
     queryFn: () => listOrders(),
   });
 
   const [selected, setSelected] = useState<OrderRow | null>(null);
   const [slips, setSlips] = useState<Record<string, string>>({});
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all");
+  const [paymentFilter, setPaymentFilter] = useState<PaymentStatus | "all">("all");
+  const [pendingId, setPendingId] = useState<string | null>(null);
 
   const mutate = useMutation({
-    mutationFn: (input: {
-      id: string;
-      status?: (typeof STATUSES)[number];
-      payment_status?: (typeof PAYMENT_STATUSES)[number];
-    }) => updateOrder({ data: input }),
-
+    mutationFn: (input: { id: string; status?: OrderStatus; payment_status?: PaymentStatus }) => {
+      setPendingId(input.id);
+      return updateOrder({ data: input });
+    },
     onSuccess: () => {
       toast.success("Order updated.");
-      void queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin"] });
     },
     onError: (e: Error) => toast.error(e.message),
+    onSettled: () => setPendingId(null),
   });
 
   async function openSlip(order: OrderRow) {
@@ -82,6 +93,34 @@ export function AdminOrders({ paymentsOnly = false }: { paymentsOnly?: boolean }
     }
   }
 
+  const scoped = useMemo(
+    () =>
+      (data ?? []).filter((o) =>
+        paymentsOnly ? o.checkout_method === "bank_transfer" || o.payment_status !== "paid" : true,
+      ),
+    [data, paymentsOnly],
+  );
+
+  const visible = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return scoped.filter((o) => {
+      if (statusFilter !== "all" && o.status !== statusFilter) return false;
+      if (paymentFilter !== "all" && o.payment_status !== paymentFilter) return false;
+      if (!term) return true;
+      return `${o.reference} ${o.customer_name} ${o.phone} ${o.email ?? ""}`
+        .toLowerCase()
+        .includes(term);
+    });
+  }, [scoped, search, statusFilter, paymentFilter]);
+
+  const filtersActive = search.trim() !== "" || statusFilter !== "all" || paymentFilter !== "all";
+
+  function clearFilters() {
+    setSearch("");
+    setStatusFilter("all");
+    setPaymentFilter("all");
+  }
+
   if (isPending) {
     return (
       <div className="space-y-3">
@@ -92,99 +131,178 @@ export function AdminOrders({ paymentsOnly = false }: { paymentsOnly?: boolean }
     );
   }
 
-  const orders = (data ?? []).filter((o) =>
-    paymentsOnly ? o.checkout_method === "bank_transfer" || o.payment_status !== "paid" : true,
-  );
-
-  if (orders.length === 0) {
-    return <p className="text-sm text-muted-foreground">No orders yet.</p>;
+  if (isError) {
+    return (
+      <div className="rounded-[1rem] border border-border p-6">
+        <p className="text-sm text-muted-foreground">
+          {(error as Error)?.message ?? "Could not load orders."}
+        </p>
+        <Button className="mt-3" size="sm" variant="outline" onClick={() => void refetch()}>
+          Try again
+        </Button>
+      </div>
+    );
   }
 
   return (
     <>
-      <div className="overflow-x-auto rounded-[1rem] border border-border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Reference</TableHead>
-              <TableHead>Customer</TableHead>
-              <TableHead className="hidden md:table-cell">Needed</TableHead>
-              <TableHead>Total</TableHead>
-              <TableHead>Payment</TableHead>
-              <TableHead className="hidden lg:table-cell">Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {orders.map((o) => (
-              <TableRow key={o.id}>
-                <TableCell className="font-medium">{o.reference}</TableCell>
-                <TableCell>
-                  <div className="min-w-0">
-                    <p className="truncate">{o.customer_name}</p>
-                    <p className="truncate text-xs text-muted-foreground">{o.phone}</p>
-                  </div>
-                </TableCell>
-                <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                  {o.pickup_date ?? "—"}
-                </TableCell>
-                <TableCell>{formatMoney(o.due_now_cents)}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={paymentTone(o.payment_status)}>
-                      {o.payment_status.replace("_", " ")}
-                    </Badge>
-                    {o.slip_path && (
-                      <Button size="icon" variant="ghost" onClick={() => openSlip(o)} title="View slip">
-                        <FileText className="h-4 w-4" aria-hidden="true" />
-                      </Button>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="hidden lg:table-cell">
-                  <Select
-                    value={o.status}
-                    onValueChange={(v) => mutate.mutate({ id: o.id, status: v as (typeof STATUSES)[number] })}
-                  >
-                    <SelectTrigger className="h-8 w-36">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUSES.map((s) => (
-                        <SelectItem key={s} value={s}>
-                          {s}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
-                    <Select
-                      value={o.payment_status}
-                      onValueChange={(v) => mutate.mutate({ id: o.id, payment_status: v as (typeof PAYMENT_STATUSES)[number] })}
-                    >
-                      <SelectTrigger className="h-8 w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PAYMENT_STATUSES.map((s) => (
-                          <SelectItem key={s} value={s}>
-                            {s.replace("_", " ")}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button size="sm" variant="outline" onClick={() => setSelected(o)}>
-                      View
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <div className="relative min-w-[200px] flex-1">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <Input
+            className="pl-9"
+            placeholder="Search reference, name, phone or email"
+            aria-label="Search orders"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as OrderStatus | "all")}>
+          <SelectTrigger className="w-40" aria-label="Filter by order status">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            {ORDER_STATUSES.map((s) => (
+              <SelectItem key={s} value={s}>
+                {statusLabel(s)}
+              </SelectItem>
             ))}
-          </TableBody>
-        </Table>
+          </SelectContent>
+        </Select>
+        <Select
+          value={paymentFilter}
+          onValueChange={(v) => setPaymentFilter(v as PaymentStatus | "all")}
+        >
+          <SelectTrigger className="w-44" aria-label="Filter by payment status">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All payments</SelectItem>
+            {PAYMENT_STATUSES.map((s) => (
+              <SelectItem key={s} value={s}>
+                {statusLabel(s)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {filtersActive && (
+          <Button variant="ghost" size="sm" onClick={clearFilters}>
+            Clear
+          </Button>
+        )}
       </div>
+
+      {scoped.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No orders yet.</p>
+      ) : visible.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No orders match those filters.</p>
+      ) : (
+        <div className="overflow-x-auto rounded-[1rem] border border-border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Reference</TableHead>
+                <TableHead>Customer</TableHead>
+                <TableHead className="hidden md:table-cell">Needed</TableHead>
+                <TableHead>Total</TableHead>
+                <TableHead>Payment</TableHead>
+                <TableHead className="hidden lg:table-cell">Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {visible.map((o) => {
+                const busy = mutate.isPending && pendingId === o.id;
+                const statusMoves = nextOrderStatuses(o.status);
+                const paymentMoves = nextPaymentStatuses(o.payment_status);
+                return (
+                  <TableRow key={o.id} className={busy ? "opacity-60" : undefined}>
+                    <TableCell className="font-medium">{o.reference}</TableCell>
+                    <TableCell>
+                      <div className="min-w-0">
+                        <p className="truncate">{o.customer_name}</p>
+                        <p className="truncate text-xs text-muted-foreground">{o.phone}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                      {o.pickup_date ?? "—"}
+                    </TableCell>
+                    <TableCell>{formatMoney(o.due_now_cents)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={paymentTone(o.payment_status)}>
+                          {statusLabel(o.payment_status)}
+                        </Badge>
+                        {o.slip_path && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => openSlip(o)}
+                            title="View slip"
+                          >
+                            <FileText className="h-4 w-4" aria-hidden="true" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell">
+                      <Select
+                        value={o.status}
+                        disabled={busy || statusMoves.length === 0}
+                        onValueChange={(v) => mutate.mutate({ id: o.id, status: v as OrderStatus })}
+                      >
+                        <SelectTrigger className="h-8 w-36" aria-label="Order status">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={o.status}>{statusLabel(o.status)}</SelectItem>
+                          {statusMoves.map((s) => (
+                            <SelectItem key={s} value={s}>
+                              {statusLabel(s)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Select
+                          value={o.payment_status}
+                          disabled={busy || paymentMoves.length === 0}
+                          onValueChange={(v) =>
+                            mutate.mutate({ id: o.id, payment_status: v as PaymentStatus })
+                          }
+                        >
+                          <SelectTrigger className="h-8 w-40" aria-label="Payment status">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={o.payment_status}>
+                              {statusLabel(o.payment_status)}
+                            </SelectItem>
+                            {paymentMoves.map((s) => (
+                              <SelectItem key={s} value={s}>
+                                {statusLabel(s)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button size="sm" variant="outline" onClick={() => setSelected(o)}>
+                          View
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       {mutate.isPending && (
         <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
@@ -230,7 +348,10 @@ export function AdminOrders({ paymentsOnly = false }: { paymentsOnly?: boolean }
                 <h3 className="eyebrow text-muted-foreground">Items</h3>
                 <ul className="mt-2 space-y-2 text-sm">
                   {(selected.order_items ?? []).map((item) => (
-                    <li key={item.id} className="flex justify-between gap-4 border-b border-border pb-2">
+                    <li
+                      key={item.id}
+                      className="flex justify-between gap-4 border-b border-border pb-2"
+                    >
                       <span>
                         {item.quantity} × {item.name}
                         {item.options && Object.keys(item.options as object).length > 0 && (
