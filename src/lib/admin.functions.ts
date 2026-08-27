@@ -33,46 +33,13 @@ async function admin() {
   return supabaseAdmin;
 }
 
-export const ORDER_STATUSES = [
-  "new",
-  "confirmed",
-  "baking",
-  "ready",
-  "collected",
-  "cancelled",
-] as const;
+export {
+  ORDER_STATUSES,
+  PAYMENT_STATUSES,
+  nextOrderStatuses,
+  nextPaymentStatuses,
+} from "@/lib/order-status";
 
-export const PAYMENT_STATUSES = [
-  "not_paid",
-  "pending_verification",
-  "paid",
-  "refunded",
-] as const;
-
-/** Only these moves are allowed; anything else is rejected server-side. */
-const NEXT_STATUS: Record<string, string[]> = {
-  new: ["confirmed", "cancelled"],
-  confirmed: ["baking", "cancelled"],
-  baking: ["ready", "cancelled"],
-  ready: ["collected", "cancelled"],
-  collected: [],
-  cancelled: [],
-};
-
-const NEXT_PAYMENT: Record<string, string[]> = {
-  not_paid: ["pending_verification", "paid"],
-  pending_verification: ["paid", "not_paid"],
-  paid: ["refunded"],
-  refunded: [],
-};
-
-export function nextOrderStatuses(current: string): string[] {
-  return NEXT_STATUS[current] ?? [];
-}
-
-export function nextPaymentStatuses(current: string): string[] {
-  return NEXT_PAYMENT[current] ?? [];
-}
 
 /** Who am I, as far as the server is concerned. */
 export const adminWhoAmI = createServerFn({ method: "GET" })
