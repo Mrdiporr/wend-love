@@ -33,12 +33,15 @@ async function admin() {
   return supabaseAdmin;
 }
 
-export {
+import {
   ORDER_STATUSES,
   PAYMENT_STATUSES,
   nextOrderStatuses,
   nextPaymentStatuses,
 } from "@/lib/order-status";
+
+export { ORDER_STATUSES, PAYMENT_STATUSES, nextOrderStatuses, nextPaymentStatuses };
+
 
 
 /** Who am I, as far as the server is concerned. */
