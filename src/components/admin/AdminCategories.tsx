@@ -114,7 +114,7 @@ export function AdminCategories() {
             <article key={c.id} className="overflow-hidden rounded-[1rem] border border-border bg-card">
               {c.image_url && (
                 <img
-                  src={imageSrc(c.image_url)}
+                  src={imageSrc({ image_url: c.image_url, image_key: c.image_key })}
                   alt={c.name}
                   loading="lazy"
                   className="aspect-[4/3] w-full object-cover"
