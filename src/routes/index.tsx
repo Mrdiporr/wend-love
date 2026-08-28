@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ShieldCheck, MapPin, Clock, Sparkles } from "lucide-react";
-import heroCake from "@/assets/hero-cake.jpg";
+import heroCake from "@/assets/cakes/cake-4.jpg";
 import { BUSINESS, PRICE_BANDS } from "@/data/catalog";
 import {
   CtaBand,
