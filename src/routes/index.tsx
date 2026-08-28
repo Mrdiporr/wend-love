@@ -52,7 +52,7 @@ function Index() {
           <div className="md:col-span-5 md:order-2">
             <img
               src={heroCake}
-              alt="Ivory buttercream celebration cake finished with gold leaf"
+              alt="Red and gold buttercream celebration cake with gold leaf and fresh florals"
               className="aspect-[4/5] w-full rounded-[1.75rem] object-cover"
             />
           </div>
