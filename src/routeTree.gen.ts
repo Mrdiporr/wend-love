@@ -23,6 +23,7 @@ import { Route as MenuIndexRouteImport } from './routes/menu.index'
 import { Route as MenuSlugRouteImport } from './routes/menu.$slug'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as AuthenticatedAdminOrdersRouteImport } from './routes/_authenticated/admin.orders'
+import { Route as AuthenticatedAdminPaymentsRouteImport } from './routes/_authenticated/admin.payments'
 import { Route as ApiPublicProductImageSplatRouteImport } from './routes/api/public/product-image/$'
 
 const IndexRoute = IndexRouteImport.update({
@@ -95,6 +96,12 @@ const AuthenticatedAdminOrdersRoute =
     path: '/orders',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminPaymentsRoute =
+  AuthenticatedAdminPaymentsRouteImport.update({
+    id: '/payments',
+    path: '/payments',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const ApiPublicProductImageSplatRoute =
   ApiPublicProductImageSplatRouteImport.update({
     id: '/api/public/product-image/$',
@@ -115,6 +122,7 @@ export interface FileRoutesByFullPath {
   '/menu/$slug': typeof MenuSlugRoute
   '/menu/': typeof MenuIndexRoute
   '/admin/orders': typeof AuthenticatedAdminOrdersRoute
+  '/admin/payments': typeof AuthenticatedAdminPaymentsRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/api/public/product-image/$': typeof ApiPublicProductImageSplatRoute
 }
@@ -130,6 +138,7 @@ export interface FileRoutesByTo {
   '/menu/$slug': typeof MenuSlugRoute
   '/menu': typeof MenuIndexRoute
   '/admin/orders': typeof AuthenticatedAdminOrdersRoute
+  '/admin/payments': typeof AuthenticatedAdminPaymentsRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/api/public/product-image/$': typeof ApiPublicProductImageSplatRoute
 }
@@ -148,6 +157,7 @@ export interface FileRoutesById {
   '/menu/$slug': typeof MenuSlugRoute
   '/menu/': typeof MenuIndexRoute
   '/_authenticated/admin/orders': typeof AuthenticatedAdminOrdersRoute
+  '/_authenticated/admin/payments': typeof AuthenticatedAdminPaymentsRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/api/public/product-image/$': typeof ApiPublicProductImageSplatRoute
 }
@@ -166,6 +176,7 @@ export interface FileRouteTypes {
     | '/menu/$slug'
     | '/menu/'
     | '/admin/orders'
+    | '/admin/payments'
     | '/admin/'
     | '/api/public/product-image/$'
   fileRoutesByTo: FileRoutesByTo
@@ -181,6 +192,7 @@ export interface FileRouteTypes {
     | '/menu/$slug'
     | '/menu'
     | '/admin/orders'
+    | '/admin/payments'
     | '/admin'
     | '/api/public/product-image/$'
   id:
@@ -198,6 +210,7 @@ export interface FileRouteTypes {
     | '/menu/$slug'
     | '/menu/'
     | '/_authenticated/admin/orders'
+    | '/_authenticated/admin/payments'
     | '/_authenticated/admin/'
     | '/api/public/product-image/$'
   fileRoutesById: FileRoutesById
@@ -317,6 +330,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminOrdersRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/payments': {
+      id: '/_authenticated/admin/payments'
+      path: '/payments'
+      fullPath: '/admin/payments'
+      preLoaderRoute: typeof AuthenticatedAdminPaymentsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/api/public/product-image/$': {
       id: '/api/public/product-image/$'
       path: '/api/public/product-image/$'
@@ -329,11 +349,13 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminOrdersRoute: typeof AuthenticatedAdminOrdersRoute
+  AuthenticatedAdminPaymentsRoute: typeof AuthenticatedAdminPaymentsRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminOrdersRoute: AuthenticatedAdminOrdersRoute,
+  AuthenticatedAdminPaymentsRoute: AuthenticatedAdminPaymentsRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
 }
 
