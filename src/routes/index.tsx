@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ShieldCheck, MapPin, Clock, Sparkles } from "lucide-react";
-import heroCake from "@/assets/hero-cake.jpg";
+const HERO_IMAGE = "/__l5e/assets-v1/8923ea7e-5d90-481c-9e35-e680b6e6c761/cake-4.jpg";
 import { BUSINESS, PRICE_BANDS } from "@/data/catalog";
 import {
   CtaBand,
@@ -51,8 +51,8 @@ function Index() {
         <div className="mx-auto grid max-w-[1200px] gap-10 px-5 py-16 md:grid-cols-12 md:items-center md:py-24">
           <div className="md:col-span-5 md:order-2">
             <img
-              src={heroCake}
-              alt="Ivory buttercream celebration cake finished with gold leaf"
+              src={HERO_IMAGE}
+              alt="Red and gold buttercream celebration cake with gold leaf and fresh florals"
               className="aspect-[4/5] w-full rounded-[1.75rem] object-cover"
             />
           </div>
