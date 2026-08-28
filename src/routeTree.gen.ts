@@ -21,6 +21,7 @@ import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as MenuIndexRouteImport } from './routes/menu.index'
 import { Route as MenuSlugRouteImport } from './routes/menu.$slug'
+import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as ApiPublicProductImageSplatRouteImport } from './routes/api/public/product-image/$'
 
 const IndexRoute = IndexRouteImport.update({
@@ -82,6 +83,11 @@ const MenuSlugRoute = MenuSlugRouteImport.update({
   path: '/menu/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
 const ApiPublicProductImageSplatRoute =
   ApiPublicProductImageSplatRouteImport.update({
     id: '/api/public/product-image/$',
@@ -98,9 +104,10 @@ export interface FileRoutesByFullPath {
   '/contact': typeof ContactRoute
   '/order': typeof OrderRoute
   '/pricing': typeof PricingRoute
-  '/admin': typeof AuthenticatedAdminRoute
+  '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/menu/$slug': typeof MenuSlugRoute
   '/menu/': typeof MenuIndexRoute
+  '/admin/': typeof AuthenticatedAdminIndexRoute
   '/api/public/product-image/$': typeof ApiPublicProductImageSplatRoute
 }
 export interface FileRoutesByTo {
@@ -112,9 +119,9 @@ export interface FileRoutesByTo {
   '/contact': typeof ContactRoute
   '/order': typeof OrderRoute
   '/pricing': typeof PricingRoute
-  '/admin': typeof AuthenticatedAdminRoute
   '/menu/$slug': typeof MenuSlugRoute
   '/menu': typeof MenuIndexRoute
+  '/admin': typeof AuthenticatedAdminIndexRoute
   '/api/public/product-image/$': typeof ApiPublicProductImageSplatRoute
 }
 export interface FileRoutesById {
@@ -128,9 +135,10 @@ export interface FileRoutesById {
   '/contact': typeof ContactRoute
   '/order': typeof OrderRoute
   '/pricing': typeof PricingRoute
-  '/_authenticated/admin': typeof AuthenticatedAdminRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/menu/$slug': typeof MenuSlugRoute
   '/menu/': typeof MenuIndexRoute
+  '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/api/public/product-image/$': typeof ApiPublicProductImageSplatRoute
 }
 export interface FileRouteTypes {
@@ -147,6 +155,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/menu/$slug'
     | '/menu/'
+    | '/admin/'
     | '/api/public/product-image/$'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -158,9 +167,9 @@ export interface FileRouteTypes {
     | '/contact'
     | '/order'
     | '/pricing'
-    | '/admin'
     | '/menu/$slug'
     | '/menu'
+    | '/admin'
     | '/api/public/product-image/$'
   id:
     | '__root__'
@@ -176,6 +185,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/menu/$slug'
     | '/menu/'
+    | '/_authenticated/admin/'
     | '/api/public/product-image/$'
   fileRoutesById: FileRoutesById
 }
@@ -280,6 +290,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MenuSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/admin/': {
+      id: '/_authenticated/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/api/public/product-image/$': {
       id: '/api/public/product-image/$'
       path: '/api/public/product-image/$'
@@ -290,12 +307,23 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
+}
+
+const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
+}
+
+const AuthenticatedAdminRouteWithChildren =
+  AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
+
 interface AuthenticatedRouteRouteChildren {
-  AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
-  AuthenticatedAdminRoute: AuthenticatedAdminRoute,
+  AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
 }
 
 const AuthenticatedRouteRouteWithChildren =
