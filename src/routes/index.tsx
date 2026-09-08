@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ShieldCheck, MapPin, Clock, Sparkles } from "lucide-react";
-const HERO_IMAGE = "/__l5e/assets-v1/8923ea7e-5d90-481c-9e35-e680b6e6c761/cake-4.jpg";
+import heroArtwork from "@/assets/brand/wendys-billboard.jpeg.asset.json";
 import { BUSINESS, PRICE_BANDS } from "@/data/catalog";
 import {
   CtaBand,
@@ -48,15 +48,16 @@ function Index() {
   return (
     <>
       <section className="relative bg-cocoa text-cocoa-foreground">
-        <div className="mx-auto grid max-w-[1200px] gap-10 px-5 py-16 md:grid-cols-12 md:items-center md:py-24">
-          <div className="md:col-span-5 md:order-2">
+        <div className="mx-auto grid max-w-[1200px] gap-10 px-5 py-14 md:grid-cols-12 md:items-center md:py-20">
+          <div className="relative md:order-2 md:col-span-6">
+            <div className="absolute -inset-2 rounded-[1.65rem] border border-gold/35 bg-cocoa-blush/15 blur-sm" aria-hidden="true" />
             <img
-              src={HERO_IMAGE}
-              alt="Red and gold buttercream celebration cake with gold leaf and fresh florals"
-              className="aspect-[4/5] w-full rounded-[1.75rem] object-cover"
+              src={heroArtwork.url}
+              alt="Wendy's Bakehouse custom cakes billboard featuring a pink leopard-print celebration cake"
+              className="relative aspect-[5/4] w-full rounded-[1.35rem] border border-gold/45 object-cover shadow-2xl"
             />
           </div>
-          <div className="md:col-span-7 md:order-1">
+          <div className="md:order-1 md:col-span-6">
             <Eyebrow>Now booking {BUSINESS.bookingMonth}</Eyebrow>
             <h1 className="mt-5 text-[2.5rem] leading-[1.03] md:text-6xl">
               Toronto celebration cakes with a{" "}
