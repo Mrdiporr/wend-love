@@ -7,7 +7,7 @@
 /*
  * Wendy's Bakehouse design system.
  * See docs/brand/BRAND-DIRECTION.md — cream page, deep berry brand,
- * cocoa ink, single antique-gold accent. All colours in oklch.
+ * midnight ink, blush pink, and antique-gold accents. All colours in oklch.
  */
 
 @theme inline {
@@ -42,6 +42,7 @@
   --color-ring-offset-background: var(--background);
   --color-cocoa: var(--cocoa);
   --color-cocoa-foreground: var(--cocoa-foreground);
+  --color-cocoa-blush: var(--cocoa-blush);
   --color-gold: var(--gold);
   --color-bronze: var(--bronze);
   --color-sidebar: var(--sidebar);
@@ -75,8 +76,9 @@
   --border: oklch(0.9 0.02 350);
   --input: oklch(0.88 0.022 350);
   --ring: oklch(0.76 0.12 82);
-  --cocoa: oklch(0.26 0.05 62);
-  --cocoa-foreground: oklch(0.96 0.02 80);
+  --cocoa: oklch(0.15 0.012 345);
+  --cocoa-foreground: oklch(0.97 0.012 350);
+  --cocoa-blush: oklch(0.69 0.13 355);
   --gold: oklch(0.78 0.12 84);
   --bronze: oklch(0.52 0.09 70);
   --sidebar: oklch(0.96 0.018 350);
@@ -109,8 +111,9 @@
   --border: oklch(1 0 0 / 14%);
   --input: oklch(1 0 0 / 18%);
   --ring: oklch(0.76 0.11 78);
-  --cocoa: oklch(0.18 0.035 55);
-  --cocoa-foreground: oklch(0.96 0.02 80);
+  --cocoa: oklch(0.12 0.01 345);
+  --cocoa-foreground: oklch(0.97 0.012 350);
+  --cocoa-blush: oklch(0.66 0.13 355);
   --gold: oklch(0.8 0.12 84);
   --bronze: oklch(0.6 0.09 70);
   --sidebar: oklch(0.23 0.03 32);
@@ -159,4 +162,12 @@
 
 @utility display {
   font-family: var(--font-display);
+}
+
+/* Shared dark surface used by the hero, page headers, mobile menu, and footer. */
+.bg-cocoa {
+  background-color: var(--cocoa);
+  background-image:
+    radial-gradient(circle at 86% 14%, color-mix(in oklab, var(--cocoa-blush) 24%, transparent) 0%, transparent 38%),
+    linear-gradient(135deg, var(--cocoa) 0%, color-mix(in oklab, var(--cocoa) 88%, var(--primary)) 58%, var(--cocoa) 100%);
 }
