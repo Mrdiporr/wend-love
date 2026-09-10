@@ -53,15 +53,55 @@ export type Database = {
         }
         Relationships: []
       }
+      delivery_zones: {
+        Row: {
+          active: boolean
+          created_at: string
+          fee_cents: number
+          id: string
+          name: string
+          postal_prefixes: string[]
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          fee_cents?: number
+          id?: string
+          name: string
+          postal_prefixes?: string[]
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          fee_cents?: number
+          id?: string
+          name?: string
+          postal_prefixes?: string[]
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
+          base_price_cents: number
           created_at: string
           deposit_cents: number | null
           id: string
+          line_due_now_cents: number
+          line_total_cents: number
           name: string
           notes: string | null
           options: Json
+          options_snapshot: Json
+          options_total_cents: number
           order_id: string
+          pack_size: number | null
+          payment_rule: Database["public"]["Enums"]["payment_rule"]
           pricing_mode: Database["public"]["Enums"]["pricing_mode"]
           product_id: string | null
           product_slug: string | null
@@ -69,13 +109,20 @@ export type Database = {
           unit_price_cents: number | null
         }
         Insert: {
+          base_price_cents?: number
           created_at?: string
           deposit_cents?: number | null
           id?: string
+          line_due_now_cents?: number
+          line_total_cents?: number
           name: string
           notes?: string | null
           options?: Json
+          options_snapshot?: Json
+          options_total_cents?: number
           order_id: string
+          pack_size?: number | null
+          payment_rule?: Database["public"]["Enums"]["payment_rule"]
           pricing_mode?: Database["public"]["Enums"]["pricing_mode"]
           product_id?: string | null
           product_slug?: string | null
@@ -83,13 +130,20 @@ export type Database = {
           unit_price_cents?: number | null
         }
         Update: {
+          base_price_cents?: number
           created_at?: string
           deposit_cents?: number | null
           id?: string
+          line_due_now_cents?: number
+          line_total_cents?: number
           name?: string
           notes?: string | null
           options?: Json
+          options_snapshot?: Json
+          options_total_cents?: number
           order_id?: string
+          pack_size?: number | null
+          payment_rule?: Database["public"]["Enums"]["payment_rule"]
           pricing_mode?: Database["public"]["Enums"]["pricing_mode"]
           product_id?: string | null
           product_slug?: string | null
@@ -116,10 +170,14 @@ export type Database = {
       orders: {
         Row: {
           allergies: string | null
+          balance_cents: number
           checkout_method: string
           created_at: string
           customer_name: string
           delivery_area: string | null
+          delivery_fee_cents: number
+          delivery_postal_code: string | null
+          delivery_snapshot: Json
           due_now_cents: number
           email: string | null
           fulfilment: string
@@ -139,16 +197,21 @@ export type Database = {
           slip_path: string | null
           status: string
           subtotal_cents: number
+          total_cents: number
           transfer_date: string | null
           transfer_reference: string | null
           updated_at: string
         }
         Insert: {
           allergies?: string | null
+          balance_cents?: number
           checkout_method?: string
           created_at?: string
           customer_name: string
           delivery_area?: string | null
+          delivery_fee_cents?: number
+          delivery_postal_code?: string | null
+          delivery_snapshot?: Json
           due_now_cents?: number
           email?: string | null
           fulfilment?: string
@@ -168,16 +231,21 @@ export type Database = {
           slip_path?: string | null
           status?: string
           subtotal_cents?: number
+          total_cents?: number
           transfer_date?: string | null
           transfer_reference?: string | null
           updated_at?: string
         }
         Update: {
           allergies?: string | null
+          balance_cents?: number
           checkout_method?: string
           created_at?: string
           customer_name?: string
           delivery_area?: string | null
+          delivery_fee_cents?: number
+          delivery_postal_code?: string | null
+          delivery_snapshot?: Json
           due_now_cents?: number
           email?: string | null
           fulfilment?: string
@@ -197,11 +265,100 @@ export type Database = {
           slip_path?: string | null
           status?: string
           subtotal_cents?: number
+          total_cents?: number
           transfer_date?: string | null
           transfer_reference?: string | null
           updated_at?: string
         }
         Relationships: []
+      }
+      product_option_choices: {
+        Row: {
+          available: boolean
+          created_at: string
+          group_id: string
+          id: string
+          key: string
+          label: string
+          price_delta_cents: number
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          available?: boolean
+          created_at?: string
+          group_id: string
+          id?: string
+          key: string
+          label: string
+          price_delta_cents?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          available?: boolean
+          created_at?: string
+          group_id?: string
+          id?: string
+          key?: string
+          label?: string
+          price_delta_cents?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_option_choices_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "product_option_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_option_groups: {
+        Row: {
+          available: boolean
+          created_at: string
+          id: string
+          key: string
+          label: string
+          product_id: string
+          required: boolean
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          available?: boolean
+          created_at?: string
+          id?: string
+          key: string
+          label: string
+          product_id: string
+          required?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          available?: boolean
+          created_at?: string
+          id?: string
+          key?: string
+          label?: string
+          product_id?: string
+          required?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_option_groups_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       products: {
         Row: {
@@ -217,6 +374,9 @@ export type Database = {
           lead_time: string
           name: string
           options: Json
+          pack_size: number | null
+          pack_unit: string | null
+          payment_rule: Database["public"]["Enums"]["payment_rule"]
           price_band: string | null
           price_cents: number | null
           price_note: string | null
@@ -241,6 +401,9 @@ export type Database = {
           lead_time?: string
           name: string
           options?: Json
+          pack_size?: number | null
+          pack_unit?: string | null
+          payment_rule?: Database["public"]["Enums"]["payment_rule"]
           price_band?: string | null
           price_cents?: number | null
           price_note?: string | null
@@ -265,6 +428,9 @@ export type Database = {
           lead_time?: string
           name?: string
           options?: Json
+          pack_size?: number | null
+          pack_unit?: string | null
+          payment_rule?: Database["public"]["Enums"]["payment_rule"]
           price_band?: string | null
           price_cents?: number | null
           price_note?: string | null
@@ -293,6 +459,9 @@ export type Database = {
           bank_name: string
           bank_note: string
           created_at: string
+          delivery_distance_config: Json
+          delivery_mode: Database["public"]["Enums"]["delivery_mode"]
+          delivery_origin_postal_code: string | null
           id: string
           singleton: boolean
           updated_at: string
@@ -304,6 +473,9 @@ export type Database = {
           bank_name?: string
           bank_note?: string
           created_at?: string
+          delivery_distance_config?: Json
+          delivery_mode?: Database["public"]["Enums"]["delivery_mode"]
+          delivery_origin_postal_code?: string | null
           id?: string
           singleton?: boolean
           updated_at?: string
@@ -315,6 +487,9 @@ export type Database = {
           bank_name?: string
           bank_note?: string
           created_at?: string
+          delivery_distance_config?: Json
+          delivery_mode?: Database["public"]["Enums"]["delivery_mode"]
+          delivery_origin_postal_code?: string | null
           id?: string
           singleton?: boolean
           updated_at?: string
@@ -367,6 +542,8 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "staff"
+      delivery_mode: "pickup_only" | "fixed_zones" | "distance"
+      payment_rule: "full" | "deposit"
       pricing_mode: "fixed" | "deposit" | "quote"
     }
     CompositeTypes: {
@@ -496,6 +673,8 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "staff"],
+      delivery_mode: ["pickup_only", "fixed_zones", "distance"],
+      payment_rule: ["full", "deposit"],
       pricing_mode: ["fixed", "deposit", "quote"],
     },
   },
