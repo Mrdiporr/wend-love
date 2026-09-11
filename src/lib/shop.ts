@@ -18,7 +18,18 @@ export type ShopCategory = {
   sort_order: number;
 };
 
-export type ProductOptionGroup = { label: string; values: string[] };
+export type ProductOptionChoice = {
+  key: string;
+  label: string;
+  price_delta_cents: number;
+};
+
+export type ProductOptionGroup = {
+  key: string;
+  label: string;
+  required: boolean;
+  choices: ProductOptionChoice[];
+};
 
 export type ShopProduct = {
   id: string;
@@ -40,6 +51,9 @@ export type ShopProduct = {
   includes: string[];
   available: boolean;
   sort_order: number;
+  payment_rule: "full" | "deposit";
+  pack_size: number | null;
+  pack_unit: string | null;
 };
 
 export type ShopSettings = {
@@ -86,7 +100,7 @@ export function imageSrc(
 }
 
 export function formatMoney(cents: number | null | undefined): string {
-  if (cents == null) return "Quoted";
+  if (cents == null) return "—";
   return new Intl.NumberFormat("en-CA", {
     style: "currency",
     currency: "CAD",
@@ -96,21 +110,20 @@ export function formatMoney(cents: number | null | undefined): string {
 
 /** Short label used on cards and listings. */
 export function priceLabel(p: {
-  pricing_mode: PricingMode;
   price_cents: number | null;
-  price_band: string | null;
+  options?: ProductOptionGroup[];
 }): string {
-  if (p.price_band) return p.price_band;
-  if (p.pricing_mode === "quote" || p.price_cents == null) return "Quoted on enquiry";
-  return formatMoney(p.price_cents);
+  if (p.price_cents == null) return "Ask for a price";
+  const hasUpgrades = (p.options ?? []).some((g) =>
+    g.choices.some((c) => c.price_delta_cents > 0),
+  );
+  return `${hasUpgrades ? "From " : ""}${formatMoney(p.price_cents)}`;
 }
 
-function parseOptions(value: unknown): ProductOptionGroup[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter(
-    (v): v is ProductOptionGroup =>
-      !!v && typeof v === "object" && "label" in v && Array.isArray((v as ProductOptionGroup).values),
-  );
+/** "12 pies per pack" style label, when the product is sold by the pack. */
+export function packLabel(p: { pack_size: number | null; pack_unit: string | null }): string | null {
+  if (!p.pack_size) return null;
+  return `${p.pack_size} ${p.pack_unit ?? "pieces"} per pack`;
 }
 
 function parseStrings(value: unknown): string[] {
@@ -123,6 +136,21 @@ export async function fetchCatalog(): Promise<{
   settings: ShopSettings;
 }> {
   const data = await getCatalog();
+
+  const choicesByGroup = new Map<string, ProductOptionChoice[]>();
+  for (const c of data.option_choices) {
+    const list = choicesByGroup.get(c.group_id) ?? [];
+    list.push({ key: c.key, label: c.label, price_delta_cents: c.price_delta_cents });
+    choicesByGroup.set(c.group_id, list);
+  }
+  const groupsByProduct = new Map<string, ProductOptionGroup[]>();
+  for (const g of data.option_groups) {
+    const choices = choicesByGroup.get(g.id) ?? [];
+    if (choices.length === 0) continue;
+    const list = groupsByProduct.get(g.product_id) ?? [];
+    list.push({ key: g.key, label: g.label, required: g.required, choices });
+    groupsByProduct.set(g.product_id, list);
+  }
 
   return {
     categories: data.categories.map((c) => ({
@@ -150,10 +178,13 @@ export async function fetchCatalog(): Promise<{
       serves: p.serves,
       image_key: p.image_key,
       image_url: p.image_url,
-      options: parseOptions(p.options),
+      options: groupsByProduct.get(p.id) ?? [],
       includes: parseStrings(p.includes),
       available: p.available,
       sort_order: p.sort_order,
+      payment_rule: (p.payment_rule ?? "full") as "full" | "deposit",
+      pack_size: p.pack_size,
+      pack_unit: p.pack_unit,
     })),
     settings: data.settings ?? FALLBACK_SETTINGS,
   };

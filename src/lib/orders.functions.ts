@@ -5,6 +5,10 @@ const itemSchema = z.object({
   slug: z.string().min(1).max(120),
   quantity: z.number().int().min(1).max(99),
   options: z.record(z.string().max(80), z.string().max(200)).default({}),
+  choices: z
+    .array(z.object({ group_key: z.string().max(80), choice_key: z.string().max(80) }))
+    .max(10)
+    .default([]),
   notes: z.string().trim().max(500).optional(),
 });
 
@@ -65,21 +69,25 @@ export const placeOrder = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => orderSchema.parse(data))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { priceLines, PricingError } = await import("@/lib/pricing.server");
 
-    const slugs = [...new Set(data.items.map((i) => i.slug))];
-    const { data: products, error: productError } = await supabaseAdmin
-      .from("products")
-      .select("id, slug, name, pricing_mode, price_cents, deposit_cents, status, lead_time")
-      .in("slug", slugs);
-
-    if (productError) throw new Error("Could not load the menu right now. Please try again.");
-
-    const bySlug = new Map((products ?? []).map((p) => [p.slug, p]));
-    for (const item of data.items) {
-      const product = bySlug.get(item.slug);
-      if (!product || product.status !== "available") {
-        throw new Error(`"${item.slug}" is no longer available. Please remove it and try again.`);
-      }
+    // Every price is recalculated here from current product rows.
+    let priced;
+    try {
+      priced = await priceLines(
+        data.items.map((i) => ({
+          slug: i.slug,
+          quantity: i.quantity,
+          choices: i.choices,
+          notes: i.notes ?? null,
+        })),
+      );
+    } catch (error) {
+      throw new Error(
+        error instanceof PricingError
+          ? error.message
+          : "We could not price your basket. Please try again.",
+      );
     }
 
     // Lead time is enforced server-side from the product records.
@@ -87,10 +95,7 @@ export const placeOrder = createServerFn({ method: "POST" })
       const today = new Date().toISOString().slice(0, 10);
       const notice = daysBetween(today, data.pickup_date);
       if (notice < 0) throw new Error("Please choose a collection date in the future.");
-      const required = Math.max(
-        0,
-        ...data.items.map((i) => leadTimeDays(bySlug.get(i.slug)?.lead_time)),
-      );
+      const required = Math.max(0, ...priced.map((l) => leadTimeDays(l.lead_time)));
       if (notice < required) {
         throw new Error(
           `Those items need at least ${required} day${required === 1 ? "" : "s"} notice. Please pick a later date.`,
@@ -98,34 +103,28 @@ export const placeOrder = createServerFn({ method: "POST" })
       }
     }
 
-    // Prices always come from the database, never from the browser.
-    let dueNow = 0;
-    let subtotal = 0;
-    let hasQuoteItems = false;
-    const lines = data.items.map((item) => {
-      const product = bySlug.get(item.slug)!;
-      const mode = product.pricing_mode;
-      if (mode === "fixed" && product.price_cents != null) {
-        dueNow += product.price_cents * item.quantity;
-        subtotal += product.price_cents * item.quantity;
-      } else if (mode === "deposit" && product.deposit_cents != null) {
-        dueNow += product.deposit_cents * item.quantity;
-        subtotal += (product.price_cents ?? 0) * item.quantity;
-      } else {
-        hasQuoteItems = true;
-      }
-      return {
-        product_id: product.id,
-        product_slug: product.slug,
-        name: product.name,
-        quantity: item.quantity,
-        unit_price_cents: product.price_cents,
-        deposit_cents: product.deposit_cents,
-        pricing_mode: mode,
-        options: item.options,
-        notes: item.notes ?? null,
-      };
-    });
+    const subtotal = priced.reduce((n, l) => n + l.line_total_cents, 0);
+    const dueNow = priced.reduce((n, l) => n + l.line_due_now_cents, 0);
+    const hasQuoteItems = false;
+
+    const lines = priced.map((l) => ({
+      product_id: l.product_id,
+      product_slug: l.product_slug,
+      name: l.name,
+      quantity: l.quantity,
+      unit_price_cents: l.unit_total_cents,
+      deposit_cents: l.deposit_cents,
+      pricing_mode: l.payment_rule === "deposit" ? "deposit" : "fixed",
+      payment_rule: l.payment_rule,
+      pack_size: l.pack_size,
+      options: l.options,
+      options_snapshot: l.options_snapshot,
+      base_price_cents: l.base_price_cents,
+      options_total_cents: l.options_total_cents,
+      line_total_cents: l.line_total_cents,
+      line_due_now_cents: l.line_due_now_cents,
+      notes: l.notes,
+    }));
 
     const reference = `WB-${new Date().getFullYear().toString().slice(2)}${Math.floor(
       100000 + Math.random() * 900000,

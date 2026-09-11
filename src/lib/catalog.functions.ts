@@ -25,10 +25,20 @@ function publicClient() {
 export const getCatalog = createServerFn({ method: "GET" }).handler(async () => {
   const supabase = publicClient();
 
-  const [cats, prods, settings] = await Promise.all([
+  const [cats, prods, settings, groups, choices] = await Promise.all([
     supabase.from("categories").select("*").eq("visible", true).order("sort_order"),
     supabase.from("products").select("*").eq("available", true).order("sort_order"),
     supabase.from("settings").select("whatsapp_number").limit(1).maybeSingle(),
+    supabase
+      .from("product_option_groups")
+      .select("id, product_id, key, label, required, available, sort_order")
+      .eq("available", true)
+      .order("sort_order"),
+    supabase
+      .from("product_option_choices")
+      .select("id, group_id, key, label, price_delta_cents, available, sort_order")
+      .eq("available", true)
+      .order("sort_order"),
   ]);
 
   if (cats.error) throw new Error(cats.error.message);
@@ -38,6 +48,8 @@ export const getCatalog = createServerFn({ method: "GET" }).handler(async () => 
     categories: cats.data ?? [],
     products: prods.data ?? [],
     settings: settings.data ?? null,
+    option_groups: groups.data ?? [],
+    option_choices: choices.data ?? [],
   };
 });
 
