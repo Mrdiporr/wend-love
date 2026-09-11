@@ -9,6 +9,7 @@ export type CartItem = {
   price_cents: number | null;
   deposit_cents: number | null;
   options: Record<string, string>;
+  choices?: { group_key: string; choice_key: string }[];
   notes?: string;
   image_key?: string | null;
   image_url?: string | null;
