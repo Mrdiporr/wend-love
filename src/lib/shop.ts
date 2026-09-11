@@ -110,21 +110,20 @@ export function formatMoney(cents: number | null | undefined): string {
 
 /** Short label used on cards and listings. */
 export function priceLabel(p: {
-  pricing_mode: PricingMode;
   price_cents: number | null;
-  price_band: string | null;
+  options?: ProductOptionGroup[];
 }): string {
-  if (p.price_band) return p.price_band;
-  if (p.pricing_mode === "quote" || p.price_cents == null) return "Quoted on enquiry";
-  return formatMoney(p.price_cents);
+  if (p.price_cents == null) return "Ask for a price";
+  const hasUpgrades = (p.options ?? []).some((g) =>
+    g.choices.some((c) => c.price_delta_cents > 0),
+  );
+  return `${hasUpgrades ? "From " : ""}${formatMoney(p.price_cents)}`;
 }
 
-function parseOptions(value: unknown): ProductOptionGroup[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter(
-    (v): v is ProductOptionGroup =>
-      !!v && typeof v === "object" && "label" in v && Array.isArray((v as ProductOptionGroup).values),
-  );
+/** "12 pies per pack" style label, when the product is sold by the pack. */
+export function packLabel(p: { pack_size: number | null; pack_unit: string | null }): string | null {
+  if (!p.pack_size) return null;
+  return `${p.pack_size} ${p.pack_unit ?? "pieces"} per pack`;
 }
 
 function parseStrings(value: unknown): string[] {
