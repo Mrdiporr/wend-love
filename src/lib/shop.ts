@@ -51,6 +51,9 @@ export type ShopProduct = {
   includes: string[];
   available: boolean;
   sort_order: number;
+  payment_rule: "full" | "deposit";
+  pack_size: number | null;
+  pack_unit: string | null;
 };
 
 export type ShopSettings = {
@@ -97,7 +100,7 @@ export function imageSrc(
 }
 
 export function formatMoney(cents: number | null | undefined): string {
-  if (cents == null) return "Quoted";
+  if (cents == null) return "—";
   return new Intl.NumberFormat("en-CA", {
     style: "currency",
     currency: "CAD",
