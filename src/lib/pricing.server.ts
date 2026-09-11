@@ -68,9 +68,6 @@ export type PricedCart = {
 
 export class PricingError extends Error {}
 
-type Db = Awaited<
-  ReturnType<typeof import("@/integrations/supabase/client.server").then>
->;
 
 /** Reads a lead time such as "5 days" or "2 weeks" into whole days. */
 export function leadTimeDays(text: string | null | undefined): number {
@@ -365,4 +362,4 @@ export async function priceCart(
   };
 }
 
-export type { Db };
+
