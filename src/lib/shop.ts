@@ -18,7 +18,18 @@ export type ShopCategory = {
   sort_order: number;
 };
 
-export type ProductOptionGroup = { label: string; values: string[] };
+export type ProductOptionChoice = {
+  key: string;
+  label: string;
+  price_delta_cents: number;
+};
+
+export type ProductOptionGroup = {
+  key: string;
+  label: string;
+  required: boolean;
+  choices: ProductOptionChoice[];
+};
 
 export type ShopProduct = {
   id: string;
