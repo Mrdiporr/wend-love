@@ -5,6 +5,10 @@ const itemSchema = z.object({
   slug: z.string().min(1).max(120),
   quantity: z.number().int().min(1).max(99),
   options: z.record(z.string().max(80), z.string().max(200)).default({}),
+  choices: z
+    .array(z.object({ group_key: z.string().max(80), choice_key: z.string().max(80) }))
+    .max(10)
+    .default([]),
   notes: z.string().trim().max(500).optional(),
 });
 
