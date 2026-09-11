@@ -137,6 +137,21 @@ export async function fetchCatalog(): Promise<{
 }> {
   const data = await getCatalog();
 
+  const choicesByGroup = new Map<string, ProductOptionChoice[]>();
+  for (const c of data.option_choices) {
+    const list = choicesByGroup.get(c.group_id) ?? [];
+    list.push({ key: c.key, label: c.label, price_delta_cents: c.price_delta_cents });
+    choicesByGroup.set(c.group_id, list);
+  }
+  const groupsByProduct = new Map<string, ProductOptionGroup[]>();
+  for (const g of data.option_groups) {
+    const choices = choicesByGroup.get(g.id) ?? [];
+    if (choices.length === 0) continue;
+    const list = groupsByProduct.get(g.product_id) ?? [];
+    list.push({ key: g.key, label: g.label, required: g.required, choices });
+    groupsByProduct.set(g.product_id, list);
+  }
+
   return {
     categories: data.categories.map((c) => ({
       id: c.id,
