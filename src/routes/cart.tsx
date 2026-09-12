@@ -31,7 +31,7 @@ function CartPage() {
       <PageHeader
         eyebrow="Basket"
         title="Everything you've picked so far."
-        lead="Fixed-price items are paid in full. Custom cakes take a deposit to hold the date, and quoted items are priced within 24 hours."
+        lead="Everyday bakes are paid in full. Tiered celebration cakes take a deposit to hold the date, with the balance due before collection."
       />
 
       <Section>
@@ -101,7 +101,7 @@ function CartPage() {
                   </div>
                   <div className="text-right">
                     <p className="font-display text-lg text-gold">
-                      {lineDueCents(item) > 0 ? formatMoney(lineDueCents(item)) : "Quoted"}
+                      {formatMoney(lineDueCents(item))}
                     </p>
                     {item.pricing_mode === "deposit" && (
                       <p className="mt-1 text-xs text-muted-foreground">deposit</p>
@@ -121,7 +121,7 @@ function CartPage() {
                   </div>
                   {hasQuoteItems && (
                     <div className="text-muted-foreground">
-                      Some items are quoted — you&rsquo;ll get a firm price within 24 hours.
+                      A deposit item is in your basket — the balance is due before collection.
                     </div>
                   )}
                 </dl>
