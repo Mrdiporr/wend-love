@@ -142,12 +142,22 @@ function Index() {
           </div>
           <div className="md:col-span-7">
             <dl className="divide-y divide-border border-y border-border">
-              {PRICE_BANDS.map((row) => (
-                <div key={row.item} className="flex items-baseline justify-between gap-6 py-4">
-                  <dt className="text-sm md:text-base">{row.item}</dt>
-                  <dd className="shrink-0 font-display text-lg text-gold">{row.price}</dd>
-                </div>
-              ))}
+              {products
+                .filter((p) => p.available && p.price_cents != null)
+                .slice(0, 8)
+                .map((p) => (
+                  <div key={p.slug} className="flex items-baseline justify-between gap-6 py-4">
+                    <dt className="text-sm md:text-base">
+                      {p.name}
+                      {packLabel(p) && (
+                        <span className="block text-xs text-muted-foreground">{packLabel(p)}</span>
+                      )}
+                    </dt>
+                    <dd className="shrink-0 font-display text-lg text-gold">
+                      {formatMoney(p.price_cents)}
+                    </dd>
+                  </div>
+                ))}
             </dl>
           </div>
         </div>
