@@ -1,10 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { PRICE_BANDS, PRODUCTS } from "@/data/catalog";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { CtaBand, PageHeader, Section } from "@/components/site/Bits";
+import { catalogQueryOptions, formatMoney, packLabel, type ShopProduct } from "@/lib/shop";
 
-const TITLE = "Pricing & Lead Times — Wendy's Bakehouse, Toronto";
+const TITLE = "Price List & Lead Times — Wendy's Bakehouse, Toronto";
 const DESC =
-  "Published price bands for custom cakes, cupcakes, gift boxes and Nigerian pastries in Toronto, plus lead times, deposits and pickup terms in Etobicoke.";
+  "Real CAD prices for celebration cakes, cake loaves, meat pie packs, small chops and cocktail drinks in Toronto, with lead times and pickup terms in Etobicoke.";
 
 export const Route = createFileRoute("/pricing")({
   head: () => ({
@@ -17,47 +18,144 @@ export const Route = createFileRoute("/pricing")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
+  loader: ({ context }) => context.queryClient.ensureQueryData(catalogQueryOptions),
+  errorComponent: () => (
+    <Section>
+      <p className="text-muted-foreground">
+        The price list could not be loaded just now. Please refresh the page.
+      </p>
+    </Section>
+  ),
+  notFoundComponent: () => (
+    <Section>
+      <p className="text-muted-foreground">That page does not exist.</p>
+    </Section>
+  ),
   component: PricingPage,
 });
 
-const LEADS = [
-  ["Cupcakes, loaves, meat pies, gift boxes", "3–5 days"],
-  ["Custom celebration cakes", "5–7 days"],
-  ["Party trays and bulk pastry orders", "1–2 weeks"],
-  ["Wedding and tiered cakes", "4–8 weeks"],
-];
+/** Upgrades that genuinely change the price, shown so the total is never a surprise. */
+function upgrades(product: ShopProduct) {
+  return product.options.flatMap((group) =>
+    group.choices
+      .filter((choice) => choice.price_delta_cents !== 0)
+      .map((choice) => ({
+        label: `${product.name} — ${choice.label}`,
+        delta: choice.price_delta_cents,
+      })),
+  );
+}
 
 function PricingPage() {
+  const { products, categories } = useSuspenseQuery(catalogQueryOptions).data;
+
+  const listed = products
+    .filter((p) => p.available && p.price_cents != null)
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+  const grouped = categories
+    .map((category) => ({
+      category,
+      items: listed.filter((p) => p.category_id === category.id),
+    }))
+    .filter((g) => g.items.length > 0);
+
+  const uncategorised = listed.filter((p) => !p.category_id);
+  if (uncategorised.length > 0) {
+    grouped.push({
+      category: { ...categories[0]!, id: "other", name: "More from the bakehouse" },
+      items: uncategorised,
+    });
+  }
+
+  const allUpgrades = listed.flatMap(upgrades);
+  const leadTimes = [...new Set(listed.map((p) => p.lead_time).filter(Boolean))];
+
   return (
     <>
       <PageHeader
-        eyebrow="Pricing"
-        title="What things cost, before you message."
-        lead="Every price here is in CAD and stated as a band. The band is honest about the range; the quote you get back is a firm number for your size, finish and date."
+        eyebrow="Price list"
+        title="What everything costs, in plain numbers."
+        lead="Every price here is the real CAD price you pay. Sizes and finishes that cost more are listed with exactly how much they add."
       />
 
       <Section>
         <div className="grid gap-12 md:grid-cols-12">
           <div className="md:col-span-7">
-            <h2 className="text-3xl">Price bands</h2>
-            <dl className="mt-6 divide-y divide-border border-y border-border">
-              {PRICE_BANDS.map((row) => (
-                <div key={row.item} className="flex items-baseline justify-between gap-6 py-4">
-                  <dt>{row.item}</dt>
-                  <dd className="shrink-0 font-display text-lg text-gold">{row.price}</dd>
-                </div>
-              ))}
-            </dl>
+            {grouped.map(({ category, items }) => (
+              <section key={category.id} className="mb-12">
+                <h2 className="text-3xl">{category.name}</h2>
+                <dl className="mt-6 divide-y divide-border border-y border-border">
+                  {items.map((p) => {
+                    const pack = packLabel(p);
+                    return (
+                      <div key={p.slug} className="flex items-baseline justify-between gap-6 py-4">
+                        <dt>
+                          <Link
+                            to="/menu/$slug"
+                            params={{ slug: p.slug }}
+                            className="font-medium hover:text-primary"
+                          >
+                            {p.name}
+                          </Link>
+                          {pack && (
+                            <span className="block text-sm text-muted-foreground">{pack}</span>
+                          )}
+                          {p.payment_rule === "deposit" && p.deposit_cents != null && (
+                            <span className="block text-sm text-muted-foreground">
+                              {formatMoney(p.deposit_cents)} deposit holds your date
+                            </span>
+                          )}
+                        </dt>
+                        <dd className="shrink-0 text-right">
+                          <span className="font-display text-lg text-gold">
+                            {formatMoney(p.price_cents)}
+                          </span>
+                          {p.lead_time && (
+                            <span className="block text-xs text-muted-foreground">
+                              {p.lead_time} notice
+                            </span>
+                          )}
+                        </dd>
+                      </div>
+                    );
+                  })}
+                </dl>
+              </section>
+            ))}
 
-            <h2 className="mt-14 text-3xl">Lead times</h2>
-            <dl className="mt-6 divide-y divide-border border-y border-border">
-              {LEADS.map(([item, lead]) => (
-                <div key={item} className="flex items-baseline justify-between gap-6 py-4">
-                  <dt>{item}</dt>
-                  <dd className="shrink-0 font-display text-lg text-gold">{lead}</dd>
-                </div>
-              ))}
-            </dl>
+            {allUpgrades.length > 0 && (
+              <>
+                <h2 className="text-3xl">Sizes and finishes that add to the price</h2>
+                <dl className="mt-6 divide-y divide-border border-y border-border">
+                  {allUpgrades.map((u) => (
+                    <div key={u.label} className="flex items-baseline justify-between gap-6 py-4">
+                      <dt className="text-sm md:text-base">{u.label}</dt>
+                      <dd className="shrink-0 font-display text-lg text-gold">
+                        {u.delta > 0 ? "+" : "−"}
+                        {formatMoney(Math.abs(u.delta))}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </>
+            )}
+
+            {leadTimes.length > 0 && (
+              <>
+                <h2 className="mt-14 text-3xl">Lead times</h2>
+                <ul className="mt-6 flex flex-wrap gap-3">
+                  {leadTimes.map((lead) => (
+                    <li
+                      key={lead}
+                      className="rounded-sm border border-border px-4 py-2 text-sm text-muted-foreground"
+                    >
+                      {lead}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
           </div>
 
           <aside className="md:col-span-5">
@@ -65,56 +163,31 @@ function PricingPage() {
               <h2 className="font-display text-2xl">How the money works</h2>
               <ul className="mt-5 space-y-4 text-sm text-muted-foreground">
                 <li>
-                  <strong className="text-foreground">Quote first.</strong> You get a firm price
-                  before any money moves.
+                  <strong className="text-foreground">Pay in full at checkout</strong> for loaves,
+                  pies, small chops and drinks.
                 </li>
                 <li>
-                  <strong className="text-foreground">Payment holds the date.</strong> Slots are
-                  held in the order they are paid for, and bookings run by the month.
+                  <strong className="text-foreground">Tiered cakes take a deposit</strong> to hold
+                  the date, with the balance due before collection.
                 </li>
                 <li>
-                  <strong className="text-foreground">Pickup is free</strong> in Etobicoke.
-                  Delivery across west Toronto is quoted by postcode.
+                  <strong className="text-foreground">Pickup is free</strong> in Etobicoke. Delivery
+                  is charged by postal code and shown at checkout before you pay.
                 </li>
                 <li>
-                  <strong className="text-foreground">What moves a price:</strong> size and tiers,
-                  fondant versus buttercream, sugar work, rush dates, and quantity for pastries.
+                  <strong className="text-foreground">All prices are in CAD</strong> and include the
+                  finish shown on the product page.
                 </li>
               </ul>
               <Link
-                to="/order"
+                to="/menu"
+                search={{}}
                 className="mt-7 inline-block rounded-sm bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground"
               >
-                Get your firm quote
+                Start your order
               </Link>
             </div>
           </aside>
-        </div>
-
-        <h2 className="mt-16 text-3xl">Item by item</h2>
-        <div className="mt-6 overflow-x-auto">
-          <table className="w-full min-w-[560px] border-collapse text-left text-sm">
-            <thead>
-              <tr className="border-b border-border">
-                <th scope="col" className="eyebrow py-3 text-muted-foreground">Item</th>
-                <th scope="col" className="eyebrow py-3 text-muted-foreground">Price</th>
-                <th scope="col" className="eyebrow py-3 text-muted-foreground">Notice</th>
-              </tr>
-            </thead>
-            <tbody>
-              {PRODUCTS.map((p) => (
-                <tr key={p.slug} className="border-b border-border">
-                  <th scope="row" className="py-4 font-medium">
-                    <Link to="/menu/$slug" params={{ slug: p.slug }} className="hover:text-primary">
-                      {p.name}
-                    </Link>
-                  </th>
-                  <td className="py-4 font-display text-base text-gold">{p.priceBand}</td>
-                  <td className="py-4 text-muted-foreground">{p.lead}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       </Section>
 

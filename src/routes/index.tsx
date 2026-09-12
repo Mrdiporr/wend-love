@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ShieldCheck, MapPin, Clock, Sparkles } from "lucide-react";
 import heroArtwork from "@/assets/brand/wendys-billboard.jpeg.asset.json";
-import { BUSINESS, PRICE_BANDS } from "@/data/catalog";
+import { BUSINESS } from "@/data/catalog";
 import {
   CtaBand,
   Eyebrow,
@@ -11,7 +11,7 @@ import {
   Section,
 } from "@/components/site/Bits";
 import { SmartImage } from "@/components/site/SmartImage";
-import { catalogQueryOptions, categoryImage } from "@/lib/shop";
+import { catalogQueryOptions, categoryImage, formatMoney, packLabel } from "@/lib/shop";
 
 const TITLE = "Wendy's Bakehouse — Custom Cakes in Toronto & Etobicoke";
 const DESC =
@@ -33,7 +33,7 @@ export const Route = createFileRoute("/")({
 
 const STEPS = [
   { n: "01", t: "Tell me the details", d: "Flavour, size, date and the look you want — through the order form or WhatsApp." },
-  { n: "02", t: "I confirm date and price", d: "A firm quote comes back within 24 hours, with your pickup window." },
+  { n: "02", t: "I confirm your date", d: "You see the price as you order, and I confirm your pickup window." },
   { n: "03", t: "Pay to hold the slot", d: "Payment secures your date. I only take what I can bake properly." },
   { n: "04", t: "Collect in Etobicoke", d: "Address shared on confirmation. Delivery is available for a fee." },
 ];
@@ -130,9 +130,8 @@ function Index() {
             <Eyebrow>Prices at a glance</Eyebrow>
             <h2 className="mt-4 text-3xl md:text-4xl">No &ldquo;DM for price&rdquo;.</h2>
             <p className="mt-5 max-w-[46ch] text-muted-foreground">
-              These are honest bands. Size, finish and detail move the final number, and the quote
-              you get back is firm — but you should know roughly what you are spending before you
-              type a message.
+              These are the real prices you pay, in CAD. Sizes and finishes that cost more are
+              listed with exactly how much they add, so nothing is a surprise at checkout.
             </p>
             <Link
               to="/pricing"
@@ -143,12 +142,22 @@ function Index() {
           </div>
           <div className="md:col-span-7">
             <dl className="divide-y divide-border border-y border-border">
-              {PRICE_BANDS.map((row) => (
-                <div key={row.item} className="flex items-baseline justify-between gap-6 py-4">
-                  <dt className="text-sm md:text-base">{row.item}</dt>
-                  <dd className="shrink-0 font-display text-lg text-gold">{row.price}</dd>
-                </div>
-              ))}
+              {products
+                .filter((p) => p.available && p.price_cents != null)
+                .slice(0, 8)
+                .map((p) => (
+                  <div key={p.slug} className="flex items-baseline justify-between gap-6 py-4">
+                    <dt className="text-sm md:text-base">
+                      {p.name}
+                      {packLabel(p) && (
+                        <span className="block text-xs text-muted-foreground">{packLabel(p)}</span>
+                      )}
+                    </dt>
+                    <dd className="shrink-0 font-display text-lg text-gold">
+                      {formatMoney(p.price_cents)}
+                    </dd>
+                  </div>
+                ))}
             </dl>
           </div>
         </div>
