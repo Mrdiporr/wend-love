@@ -205,11 +205,10 @@ export const adminListProducts = createServerFn({ method: "GET" })
     return { products: prods.data ?? [], categories: cats.data ?? [] };
   });
 
-const optionGroup = z.object({
-  label: z.string().trim().min(1).max(80),
-  values: z.array(z.string().trim().min(1).max(80)).max(20),
-});
-
+/**
+ * Payment rule is an explicit choice, never guessed from empty prices.
+ * `pricing_mode` is derived from it so old readers stay correct.
+ */
 const productSchema = z
   .object({
     id: z.string().uuid().optional(),
@@ -223,25 +222,55 @@ const productSchema = z
     category_id: z.string().uuid().nullable(),
     short: z.string().trim().max(240).default(""),
     description: z.string().trim().max(4000).default(""),
-    pricing_mode: z.enum(["fixed", "deposit", "quote"]),
+    payment_rule: z.enum(["full", "deposit"]),
     price_cents: z.number().int().min(0).max(10_000_00).nullable(),
     deposit_cents: z.number().int().min(0).max(10_000_00).nullable(),
-    price_band: z.string().trim().max(80).nullable(),
+    pack_size: z.number().int().min(1).max(1000).nullable(),
+    pack_unit: z.string().trim().max(40).nullable(),
     price_note: z.string().trim().max(200).nullable(),
     lead_time: z.string().trim().max(80).default(""),
     serves: z.string().trim().max(80).nullable(),
-    options: z.array(optionGroup).max(10).default([]),
     includes: z.array(z.string().trim().min(1).max(160)).max(20).default([]),
     image_url: z.string().trim().max(500).nullable(),
     status: z.enum(["available", "unavailable", "archived"]),
     sort_order: z.number().int().min(0).max(9999),
   })
   .superRefine((v, ctx) => {
-    if (v.pricing_mode === "fixed" && v.price_cents == null) {
-      ctx.addIssue({ code: "custom", message: "A fixed-price cake needs a price.", path: ["price_cents"] });
+    if (v.price_cents == null) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Every product needs a published price.",
+        path: ["price_cents"],
+      });
+      return;
     }
-    if (v.pricing_mode === "deposit" && v.deposit_cents == null) {
-      ctx.addIssue({ code: "custom", message: "A deposit product needs a deposit.", path: ["deposit_cents"] });
+    if (v.payment_rule === "deposit") {
+      if (v.deposit_cents == null) {
+        ctx.addIssue({
+          code: "custom",
+          message: "A deposit product needs a deposit amount.",
+          path: ["deposit_cents"],
+        });
+      } else if (v.deposit_cents > v.price_cents) {
+        ctx.addIssue({
+          code: "custom",
+          message: "The deposit cannot be larger than the price.",
+          path: ["deposit_cents"],
+        });
+      } else if (v.deposit_cents <= 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: "The deposit must be more than zero.",
+          path: ["deposit_cents"],
+        });
+      }
+    }
+    if (v.pack_size != null && !v.pack_unit) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Say what the pack contains, for example \"pies\".",
+        path: ["pack_unit"],
+      });
     }
   });
 
